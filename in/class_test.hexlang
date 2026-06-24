@@ -1,0 +1,6 @@
+class Vector {
+    x: number;
+    y: number;
+}
+
+let vec = Vector(2, 3);

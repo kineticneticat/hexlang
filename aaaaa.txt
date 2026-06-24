@@ -1,0 +1,20 @@
+Main global
+Compiler.compile
+Blockstatement.compile
+DeclarationStmt.compile
+Compiler.declareVariable
+    CallExpr.compile - blank call
+        blank doesnt need parent
+        arg - CallExpr.compile - eyepos call
+            needs parent - CallExpr.compile - caster call
+                doesnt need parent
+                no args
+                method - MemberExpr.compile - caster method
+                    parent - SymbolExpr.compile - world classinstance
+                        ClassInstance.getAccessHex - access world's getter
+                            Builtin.getAccessHex - access world getter
+                                HardcodedExpr.compile - compile world 
+                                    wss += 0
+                    parenttype - 
+
+

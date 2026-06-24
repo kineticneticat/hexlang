@@ -1,0 +1,3 @@
+let number = 7313812;
+let array = [1, 2, [1,2,3]];
+let add = 1+2;

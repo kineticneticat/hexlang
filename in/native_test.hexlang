@@ -1,0 +1,6 @@
+native test(): number {
+    Mind's Reflection;
+    Compass' Purification;
+}
+
+io.print(test);

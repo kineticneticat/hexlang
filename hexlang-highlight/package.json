@@ -1,0 +1,25 @@
+{
+  "name": "hexlang-highlight",
+  "displayName": "hexlang-highlight",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.102.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "hexlang",
+      "aliases": ["hexlang", "hexlang"],
+      "extensions": [".hexlang"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "hexlang",
+      "scopeName": "source.hexlang",
+      "path": "./syntaxes/hexlang.tmLanguage.json"
+    }]
+  }
+}

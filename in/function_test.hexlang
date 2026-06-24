@@ -1,0 +1,10 @@
+let foo = 2;
+
+function bing(eep: number): number {
+    let spam = foo + eep;
+    return spam;
+}
+
+io.print(bing(2));
+
+

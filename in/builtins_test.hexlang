@@ -1,0 +1,2 @@
+let target = world.raycast.block(world.caster.eyepos, world.caster.lookdir);
+io.print(target);

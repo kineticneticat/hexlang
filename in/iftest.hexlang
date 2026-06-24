@@ -1,0 +1,5 @@
+let bingle = 1;
+if (bingle == 1) {
+    bingle = bingle + 1;
+    let bobo = 2;
+}

@@ -1,0 +1,9 @@
+{
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "@typescript/native-preview": "^7.0.0-dev.20260421.2"
+  },
+  "dependencies": {
+    "ts-node": "^10.9.2"
+  }
+}

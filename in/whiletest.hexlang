@@ -1,0 +1,4 @@
+let bweh = 0;
+while (bweh <= 10) {
+    bweh = bweh + 10;
+}
