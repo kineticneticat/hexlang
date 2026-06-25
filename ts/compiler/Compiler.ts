@@ -1,9 +1,9 @@
-import { Statement } from "../parser/Statements";
+import { SyntaxStatement } from "../parser/SyntaxStatements";
 import { CodeError } from "../Util";
 import { Pattern } from "./Hex/Hex";
 import { Patterns } from "./Hex/Patterns";
-import { Builtins } from "./types/Builtins";
-import { HardcodedExpr, HexType } from "./types/Types";
+// import { Builtins } from "./types/Builtins";
+import { HexType } from "./types/Types";
 
 interface Variable {
     name: string
@@ -47,9 +47,9 @@ export class Frame {
 }
 
 export class Compiler {
-    static compile(ast: Statement) {
+    static compile(ast: SyntaxStatement) {
         let compiler = new Compiler()
-        return {hex: ast.compile(compiler), compiler: compiler}
+        // return {hex: ast.compile(compiler), compiler: compiler}
     }
     frameStack: Frame[]
     constructor() {

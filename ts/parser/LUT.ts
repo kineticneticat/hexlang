@@ -3,9 +3,9 @@ import { Patterns } from "../compiler/Hex/Patterns";
 import { HexAny, HexNumber, HexType } from "../compiler/types/Types";
 import { Token, TokenKind } from "../lexer/Token";
 import { CodeError } from "../Util";
-import { Expression, parseBinaryExpr, parsePrimaryExpr, parseGroupingExpr, parseAssignmentExpr, parseMemberExpr, parseCallExpr, parseArrayExpr } from "./Expressions";
+import { SyntaxExpression, parseBinaryExpr, parsePrimaryExpr, parseGroupingExpr, parseAssignmentExpr, parseMemberExpr, parseCallExpr, parseArrayExpr } from "./SyntaxExpressions";
 import { Parser } from "./Parser";
-import { parseClassStmt, parseDeclStmt, parseForStmt, parseFunctionStmt, parseIfStmt, parseNativeStmt, parseReturnStmt, parseWhileStmt, Statement } from "./Statements";
+import { parseClassStmt, parseDeclStmt, parseForStmt, parseFunctionStmt, parseIfStmt, parseNativeStmt, parseReturnStmt, parseWhileStmt, SyntaxStatement } from "./SyntaxStatements";
 
 export enum BindingPower {
     DEFAULT,
@@ -21,7 +21,7 @@ export enum BindingPower {
     PRIMARY
 }
 
-export type StatementHandler = (parser: Parser) => Statement
+export type StatementHandler = (parser: Parser) => SyntaxStatement
 export let StatementHandlers = new Map<TokenKind, StatementHandler>([
     [TokenKind.LET, parseDeclStmt],
     [TokenKind.CONST, parseDeclStmt],
@@ -33,7 +33,6 @@ export let StatementHandlers = new Map<TokenKind, StatementHandler>([
     [TokenKind.RETURN, parseReturnStmt],
     [TokenKind.CLASS, parseClassStmt]
 ])
-
 
 let BindingPowers = new Map<TokenKind, BindingPower>([
     [TokenKind.NUMBERLITERAL, BindingPower.PRIMARY],
@@ -57,7 +56,7 @@ export function getBP(token: Token) {
     else return BindingPower.DEFAULT
 }
 
-type NUDHandler = (parser: Parser) => Expression
+type NUDHandler = (parser: Parser) => SyntaxExpression
 let NUDHandlers = new Map<TokenKind, NUDHandler>([
     [TokenKind.NUMBERLITERAL, parsePrimaryExpr],
     [TokenKind.STRINGLITERAL, parsePrimaryExpr],
@@ -72,7 +71,7 @@ export function getNUD(token: Token) {
     else throw token.source.Error(`No NUD handler found for ${TokenKind[token.kind]}`)
 }
 
-type LEDHandler = (parser: Parser, left: Expression, bp: BindingPower) => Expression
+type LEDHandler = (parser: Parser, left: SyntaxExpression, bp: BindingPower) => SyntaxExpression
 let LEDHandlers = new Map<TokenKind, LEDHandler>([
     [TokenKind.PLUS, parseBinaryExpr],
     [TokenKind.DASH, parseBinaryExpr],
@@ -112,16 +111,4 @@ export function areBinOpArgsValid(left: HexType, right: HexType, op: TokenKind):
         if (sig.left.canCastFrom(left) && sig.right.canCastFrom(right)) return sig.result
     }
     return null
-}
-
-const TokenPatterns = new Map<TokenKind, Pattern>([
-    [TokenKind.PLUS, Patterns.Add],
-    [TokenKind.DASH, Patterns.Subtract],
-    [TokenKind.ASTERISK, Patterns.Multipy],
-    [TokenKind.SLASH, Patterns.Divide],
-    [TokenKind.EQUALITY, Patterns.Equality],
-])
-export function getTokenPattern(kind: TokenKind) {
-    if (!TokenPatterns.has(kind)) throw new CodeError(`Token ${TokenKind[kind]} does not have an associated pattern`)
-    return TokenPatterns.get(kind) as Pattern
 }

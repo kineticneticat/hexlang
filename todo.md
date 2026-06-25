@@ -7,3 +7,7 @@
 - implement importing
 - nuke builtins and fully use imported symbols w/ natives
 - also like allow for describing more than just 3 types
+- stop stripping all whitespace pre-tokenisation, so that they get proper locators
+- properly propagate locators through so that error messages are better
+- pretty up errors
+- actually implement user classes

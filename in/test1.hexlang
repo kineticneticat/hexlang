@@ -1,0 +1,4 @@
+let foo = 21;
+if (foo < 20) {
+    io.print(foo);
+}
