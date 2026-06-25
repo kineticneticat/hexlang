@@ -3,30 +3,30 @@ import { CodeError } from "../Util";
 import { Compiler } from "../4-Compiler/Compiler";
 import { Pattern } from "../4-Compiler/Hex/Hex";
 import { Patterns } from "../4-Compiler/Hex/Patterns";
-// import { Builtin } from "./Builtins";
 
-// export class HardcodedExpr implements BoundExpression {
-//     constructor(
-//         public type: HexType,
-//         public hex: Pattern[],
-//         public wssdelta: number = 0
-//     ) {}
-//     compile(compiler: Compiler): Pattern[] {
-//         compiler.workingStackSize += this.wssdelta
-//         return this.hex
-//     }
-// }
+
+export class HardcodedExpr implements BoundExpression {
+    constructor(
+        public type: HexType,
+        public hex: Pattern[],
+        public wssdelta: number = 0
+    ) {}
+    compile(compiler: Compiler): Pattern[] {
+        compiler.workingStackSize += this.wssdelta
+        return this.hex
+    }
+}
 
 
 export abstract class HexType {
     abstract name: string
     symbols = new Map<string, BoundExpression>([])
-    getSymbolHex(compiler: Compiler, property: string): Pattern[] | undefined {
-        if (!this.symbols.has(property)) return undefined
-        let prop = this.symbols.get(property) as BoundExpression
-        let doer = prop.compile(compiler)as Pattern[]
-        return [doer].flat()
-    }
+    // getSymbolHex(compiler: Compiler, property: string): Pattern[] | undefined {
+    //     if (!this.symbols.has(property)) return undefined
+    //     let prop = this.symbols.get(property) as BoundExpression
+    //     let doer = prop.compile(compiler)as Pattern[]
+    //     return [doer].flat()
+    // }
     getSymbolType(property: string): HexType | undefined {
         if (!this.symbols.has(property)) return undefined
         return (this.symbols.get(property) as BoundExpression).type as HexType
@@ -36,12 +36,12 @@ export abstract class HexType {
     }
 
     fields = new Map<string, BoundExpression>([])
-    getFieldHex(compiler: Compiler, getter: Pattern[], property: string): Pattern[] | undefined {
-        if (!this.fields.has(property)) return undefined
-        let prop = this.fields.get(property) as BoundExpression
-        let doer = prop.compile(compiler)as Pattern[]
-        return [getter, doer].flat()
-    }
+    // getFieldHex(compiler: Compiler, getter: Pattern[], property: string): Pattern[] | undefined {
+    //     if (!this.fields.has(property)) return undefined
+    //     let prop = this.fields.get(property) as BoundExpression
+    //     let doer = prop.compile(compiler)as Pattern[]
+    //     return [getter, doer].flat()
+    // }
     getFieldType(property: string): HexType | undefined {
         if (!this.fields.has(property)) return undefined
         return (this.fields.get(property) as BoundExpression).type as HexType
@@ -73,14 +73,14 @@ export abstract class HexType {
             return type
         } else throw new CodeError(`Tried to type ${property} on ${this.name}, but couldn't find the prop.`)
     }
-    getStaticHex(compiler: Compiler, parent: BoundExpression, propery: string): Pattern[] {
-        if (this.getSymbolType(propery)) {
-            return this.getSymbolHex(compiler, propery) as Pattern[]
-        } else if (this.getFieldType(propery)) {
-            return this.getFieldHex(compiler, parent.compile(compiler), propery) as Pattern[]
-        }
-        throw new CodeError(`Tried to access ${propery} on ${this.name}, but couldn't find the prop.`)
-    }
+    // getStaticHex(compiler: Compiler, parent: BoundExpression, propery: string): Pattern[] {
+    //     if (this.getSymbolType(propery)) {
+    //         return this.getSymbolHex(compiler, propery) as Pattern[]
+    //     } else if (this.getFieldType(propery)) {
+    //         return this.getFieldHex(compiler, parent.compile(compiler), propery) as Pattern[]
+    //     }
+    //     throw new CodeError(`Tried to access ${propery} on ${this.name}, but couldn't find the prop.`)
+    // }
 
     // true if `that` can be cast to `this`, false otherwise
     // i.e number can cast to any, but any cant cast to number
@@ -256,55 +256,56 @@ function positionInIterator(x: string, keys: MapIterator<string>) {
     return -1
 }
 
-// export class Class extends Executable {
+export class Class extends Executable {
 
-//     constructor(
-//         public name: string,
-//         public symbols: Map<string, BoundExpression>,
-//         public fields: Map<string, BoundExpression>,
-//     ) {
-//         super()
-//         // If constructor is not defined, then 
-//         if (!symbols.has("constructor") && !fields.has("constructor")) {
-//             symbols.set("constructor", new HardcodedExpr(new Native([], new ClassInstance(this)), [Patterns.EmptyList], 1))
-//         }
-//         let constr = this.getConstructor()
-//         if (!(constr.type instanceof Executable)) throw new CodeError("Somehow have a constructor with a non-executable type?")
-//         if ((constr.type.returnType instanceof ClassInstance)) throw new CodeError(`${this.name}'s constructor does not return a class instance.`)
-//     }
-//     getConstructor() {return (this.symbols.get("constructor") || this.fields.get("constructor") as BoundExpression)}
-//     get paramTypes() { return (this.getConstructor().type as Executable).paramTypes}
-//     get returnType() { return (this.getConstructor().type as Executable).returnType}
-//     canCastFrom(that: HexType): boolean {
-//         return false
-//     }
-// }
-// export class ClassInstance extends HexType {
-//     name: string;
-//     constructor(
-//         public parent: Class,
-//     ) {
-//         super()
-//         this.name = "I" + parent.name
-//     }
-//     canCastFrom(that: HexType): boolean {
-//         return this.name == that.name
-//     }
-//     getAccessHex(compiler: Compiler, name: string): Pattern[] {
-//         if (this.parent instanceof Builtin) return this.parent.getAccessHex(compiler, name)
-//         return super.getAccessHex(compiler, name)
-//     }
-//     getFieldType(property: string): HexType | undefined {
-//         return this.parent.getFieldType(property)
-//     }
-//     getFieldHex(compiler: Compiler, getter: Pattern[], property: string): Pattern[] | undefined {
-//         return this.parent.getFieldHex(compiler, getter, property)
-//     }
-//     getSymbolType(property: string): HexType | undefined {
-//         return this.parent.getSymbolType(property)
-//     }
-//     getSymbolHex(compiler: Compiler, property: string): Pattern[] | undefined {
-//         return this.parent.getSymbolHex(compiler, property)
-//     }
-// }
+    constructor(
+        public name: string,
+        public symbols: Map<string, BoundExpression>,
+        public fields: Map<string, BoundExpression>,
+    ) {
+        super()
+        // If constructor is not defined, then 
+        if (!symbols.has("constructor") && !fields.has("constructor")) {
+            symbols.set("constructor", new HardcodedExpr(new Native([], new ClassInstance(this)), [Patterns.EmptyList], 1))
+        }
+        let constr = this.getConstructor()
+        if (!(constr.type instanceof Executable)) throw new CodeError("Somehow have a constructor with a non-executable type?")
+        if ((constr.type.returnType instanceof ClassInstance)) throw new CodeError(`${this.name}'s constructor does not return a class instance.`)
+    }
+    getConstructor() {return (this.symbols.get("constructor") || this.fields.get("constructor") as BoundExpression)}
+    get paramTypes() { return (this.getConstructor().type as Executable).paramTypes}
+    get returnType() { return (this.getConstructor().type as Executable).returnType}
+    canCastFrom(that: HexType): boolean {
+        return false
+    }
+}
+export class ClassInstance extends HexType {
+    name: string;
+    constructor(
+        public parent: Class,
+    ) {
+        super()
+        this.name = "I" + parent.name
+    }
+    canCastFrom(that: HexType): boolean {
+        return this.name == that.name
+    }
+    getAccessHex(compiler: Compiler, name: string): Pattern[] {
+        // ok need to deal with this
+        // if (this.parent instanceof Builtin) return this.parent.getAccessHex(compiler, name)
+        return super.getAccessHex(compiler, name)
+    }
+    getFieldType(property: string): HexType | undefined {
+        return this.parent.getFieldType(property)
+    }
+    // getFieldHex(compiler: Compiler, getter: Pattern[], property: string): Pattern[] | undefined {
+    //     return this.parent.getFieldHex(compiler, getter, property)
+    // }
+    getSymbolType(property: string): HexType | undefined {
+        return this.parent.getSymbolType(property)
+    }
+    // getSymbolHex(compiler: Compiler, property: string): Pattern[] | undefined {
+    //     return this.parent.getSymbolHex(compiler, property)
+    // }
+}
 

@@ -2,21 +2,21 @@ import { Pattern } from "../4-Compiler/Hex/Hex";
 import { HexType } from "../types/Types";
 import { BoundExpression } from "./BoundExpressions";
 
-interface BoundStatement {}
+export interface BoundStatement {}
 
-export class BlockBStatement implements BoundStatement {
+export class BoundBlock implements BoundStatement {
     constructor(
         public statements: BoundStatement[]
     ) {}
 }
 
-export class ExpressionBStmt implements BoundStatement {
+export class BoundExpressionStmt implements BoundStatement {
     constructor(
         public expression: BoundExpression
     ) {}
 }
 
-export class DeclarationBStmt implements BoundStatement {
+export class BoundDeclaration implements BoundStatement {
     constructor(
         public name: string,
         public mutable: boolean,
@@ -25,51 +25,52 @@ export class DeclarationBStmt implements BoundStatement {
     ) {}
 }
 
-type elif = {condition: null, block: BlockBStatement}
-export class IfBStatement implements BoundStatement {
+type elif = {condition: BoundExpression, block: BoundBlock}
+export class BoundIf implements BoundStatement {
     constructor(
         public condition: BoundExpression,
-        public ifblock: BlockBStatement,
+        public ifblock: BoundBlock,
         public elifs: elif[],
-        public elseblock?: BlockBStatement,
+        public elseblock?: BoundBlock,
     ) {}
 }
 
-export class ForBStatement implements BoundStatement {
+export class BoundFor implements BoundStatement {
     constructor(
         public symbol: string,
         public iterable: BoundExpression,
-        public body: BlockBStatement
+        public body: BoundBlock
     ) {}
 }
 
-export class WhileBStatement implements BoundStatement {
+export class BoundWhile implements BoundStatement {
     constructor(
         condition: BoundExpression,
-        body: BlockBStatement
+        body: BoundBlock
     ) {}
 }
 
-export class FunctionBStmt implements BoundStatement {
+export class BoundFunction implements BoundStatement {
     constructor(
         name: string,
         args: number,
-        body: BlockBStatement,
+        body: BoundBlock,
         captures: string[]
     ) {}
 }
 
-export class ReturnBStatement implements BoundStatement {
+export class BoundReturn implements BoundStatement {
     constructor(
         value?: BoundExpression
     ) {}
 }
 
-export class NativeBStmt implements BoundStatement {
+export class BoundNative implements BoundStatement {
     constructor(
+        name: string,
         args: number,
         body: Pattern[]
     ) {}
 }
 
-export class ClassBStatement implements BoundStatement {}
+export class BoundClass implements BoundStatement {}

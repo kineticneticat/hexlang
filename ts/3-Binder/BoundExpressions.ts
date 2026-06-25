@@ -36,7 +36,7 @@ export class BoundSymbol implements BoundExpression {
     ) {}
 }
 
-type BoundOperator = {accessor: (compiler: Compiler) => Pattern[], type: HexType}
+export type BoundOperator = {accessor: (compiler: Compiler) => Pattern[], type: HexType}
 export class BoundBinaryExpr implements BoundExpression {
     constructor(
         public operator: BoundOperator,
@@ -66,7 +66,14 @@ export class BoundMember implements BoundExpression {
     }
 }
 
-export class BoundCall implements BoundExpression {
+export class BoundCallClosure implements BoundExpression {
+    constructor(
+        public method: BoundExpression,
+        public args: BoundExpression[],
+        public type: HexType
+    ) {}
+}
+export class BoundCallNative implements BoundExpression {
     constructor(
         public method: BoundExpression,
         public args: BoundExpression[],

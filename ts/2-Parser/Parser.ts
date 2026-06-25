@@ -1,6 +1,5 @@
-import { HexType } from "../types/Types";
-import { Token, TokenKind } from "../1-Lexer/Token";
-import { BlockStmt, parseStmt, SyntaxStatement } from "./SyntaxStatements";
+import { Token, TokenKind } from "../1-Lexer/Token"
+import { SyntaxBlock, SyntaxStatement, parseStmt } from "./SyntaxStatements"
 
 
 export class Parser {
@@ -33,5 +32,5 @@ export function parse(tokens: Token[]) {
     while (parser.hasTokens) {
         stmts.push(parseStmt(parser))
     }
-    return new BlockStmt(stmts)
+    return new SyntaxBlock(stmts)
 }

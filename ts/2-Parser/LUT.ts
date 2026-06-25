@@ -1,5 +1,4 @@
-import { Pattern } from "../4-Compiler/Hex/Hex";
-import { Patterns } from "../4-Compiler/Hex/Patterns";
+
 import { HexAny, HexNumber, HexType } from "../types/Types";
 import { Token, TokenKind } from "../1-Lexer/Token";
 import { CodeError } from "../Util";
