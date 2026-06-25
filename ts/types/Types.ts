@@ -1,11 +1,11 @@
-import { SyntaxExpression } from "../../parser/SyntaxExpressions";
-import { CodeError } from "../../Util";
-import { Compiler } from "../Compiler";
-import { Pattern } from "../Hex/Hex";
-import { Patterns } from "../Hex/Patterns";
+import { BoundExpression } from "../3-Binder/BoundExpressions";
+import { CodeError } from "../Util";
+import { Compiler } from "../4-Compiler/Compiler";
+import { Pattern } from "../4-Compiler/Hex/Hex";
+import { Patterns } from "../4-Compiler/Hex/Patterns";
 // import { Builtin } from "./Builtins";
 
-// export class HardcodedExpr implements Expression {
+// export class HardcodedExpr implements BoundExpression {
 //     constructor(
 //         public type: HexType,
 //         public hex: Pattern[],
@@ -20,67 +20,67 @@ import { Patterns } from "../Hex/Patterns";
 
 export abstract class HexType {
     abstract name: string
-    // symbols = new Map<string, Expression>([])
-    // getSymbolHex(compiler: Compiler, property: string): Pattern[] | undefined {
-    //     if (!this.symbols.has(property)) return undefined
-    //     let prop = this.symbols.get(property) as Expression
-    //     let doer = prop.compile(compiler)as Pattern[]
-    //     return [doer].flat()
-    // }
-    // getSymbolType(property: string): HexType | undefined {
-    //     if (!this.symbols.has(property)) return undefined
-    //     return (this.symbols.get(property) as Expression).type as HexType
-    // }
-    // setSymbolHex(compiler: Compiler, property: string, value: Pattern[]): Pattern[] {
-    //     throw new CodeError(`Cant set Symbols on type ${this.name}`)
-    // }
+    symbols = new Map<string, BoundExpression>([])
+    getSymbolHex(compiler: Compiler, property: string): Pattern[] | undefined {
+        if (!this.symbols.has(property)) return undefined
+        let prop = this.symbols.get(property) as BoundExpression
+        let doer = prop.compile(compiler)as Pattern[]
+        return [doer].flat()
+    }
+    getSymbolType(property: string): HexType | undefined {
+        if (!this.symbols.has(property)) return undefined
+        return (this.symbols.get(property) as BoundExpression).type as HexType
+    }
+    setSymbolHex(compiler: Compiler, property: string, value: Pattern[]): Pattern[] {
+        throw new CodeError(`Cant set Symbols on type ${this.name}`)
+    }
 
-    // fields = new Map<string, Expression>([])
-    // getFieldHex(compiler: Compiler, getter: Pattern[], property: string): Pattern[] | undefined {
-    //     if (!this.fields.has(property)) return undefined
-    //     let prop = this.fields.get(property) as Expression
-    //     let doer = prop.compile(compiler)as Pattern[]
-    //     return [getter, doer].flat()
-    // }
-    // getFieldType(property: string): HexType | undefined {
-    //     if (!this.fields.has(property)) return undefined
-    //     return (this.fields.get(property) as Expression).type as HexType
-    // }
-    // setFieldHex(compiler: Compiler, getter: Pattern[], property: string, value: Pattern[]): Pattern[] {
-    //     throw new CodeError(`Cant set Fields on type ${this.name}`)
-    // }
+    fields = new Map<string, BoundExpression>([])
+    getFieldHex(compiler: Compiler, getter: Pattern[], property: string): Pattern[] | undefined {
+        if (!this.fields.has(property)) return undefined
+        let prop = this.fields.get(property) as BoundExpression
+        let doer = prop.compile(compiler)as Pattern[]
+        return [getter, doer].flat()
+    }
+    getFieldType(property: string): HexType | undefined {
+        if (!this.fields.has(property)) return undefined
+        return (this.fields.get(property) as BoundExpression).type as HexType
+    }
+    setFieldHex(compiler: Compiler, getter: Pattern[], property: string, value: Pattern[]): Pattern[] {
+        throw new CodeError(`Cant set Fields on type ${this.name}`)
+    }
 
-    // getIndexHex(compiler: Compiler, getter: Pattern[], property: Pattern[]): Pattern[] {
-    //     throw new CodeError(`Cant access Indices on type ${this.name}`)
-    // }
-    // getIndexType(property: Pattern[]): HexType | null {
-    //     return null
-    //     // throw new CodeError(`Cant access Indices on type ${this.name}`)
-    // }
-    // setIndexHex(compiler: Compiler, getter: Pattern[], property: Pattern[], value: Pattern[]): Pattern[] {
-    //     throw new CodeError(`Cant set Indices on type ${this.name}`)
-    // }
+    getIndexHex(compiler: Compiler, getter: Pattern[], property: Pattern[]): Pattern[] {
+        throw new CodeError(`Cant access Indices on type ${this.name}`)
+    }
+    getIndexType(property: Pattern[]): HexType | null {
+        return null
+        // throw new CodeError(`Cant access Indices on type ${this.name}`)
+    }
+    setIndexHex(compiler: Compiler, getter: Pattern[], property: Pattern[], value: Pattern[]): Pattern[] {
+        throw new CodeError(`Cant set Indices on type ${this.name}`)
+    }
 
     getAccessHex(compiler: Compiler, name: string): Pattern[] {
         return compiler.getVariable(name)
     }
 
-    // getStaticType(property: string) {
-    //     let type: HexType | undefined
-    //     if (( type = this.getSymbolType(property))) {
-    //         return type
-    //     } else if (( type = this.getFieldType(property))) {
-    //         return type
-    //     } else throw new CodeError(`Tried to type ${property} on ${this.name}, but couldn't find the prop.`)
-    // }
-    // getStaticHex(compiler: Compiler, parent: Expression, propery: string): Pattern[] {
-    //     if (this.getSymbolType(propery)) {
-    //         return this.getSymbolHex(compiler, propery) as Pattern[]
-    //     } else if (this.getFieldType(propery)) {
-    //         return this.getFieldHex(compiler, parent.compile(compiler), propery) as Pattern[]
-    //     }
-    //     throw new CodeError(`Tried to access ${propery} on ${this.name}, but couldn't find the prop.`)
-    // }
+    getStaticType(property: string) {
+        let type: HexType | undefined
+        if (( type = this.getSymbolType(property))) {
+            return type
+        } else if (( type = this.getFieldType(property))) {
+            return type
+        } else throw new CodeError(`Tried to type ${property} on ${this.name}, but couldn't find the prop.`)
+    }
+    getStaticHex(compiler: Compiler, parent: BoundExpression, propery: string): Pattern[] {
+        if (this.getSymbolType(propery)) {
+            return this.getSymbolHex(compiler, propery) as Pattern[]
+        } else if (this.getFieldType(propery)) {
+            return this.getFieldHex(compiler, parent.compile(compiler), propery) as Pattern[]
+        }
+        throw new CodeError(`Tried to access ${propery} on ${this.name}, but couldn't find the prop.`)
+    }
 
     // true if `that` can be cast to `this`, false otherwise
     // i.e number can cast to any, but any cant cast to number
@@ -166,7 +166,7 @@ class _HexVoid extends Primitive {
 export const HexVoid = new _HexVoid
 class _HexVector extends Primitive {
     name = "vector"
-    // fields = new Map<string, Expression>([
+    // fields = new Map<string, BoundExpression>([
     //     ["x", new HardcodedExpr(HexNumber, [Patterns.SplitVector, Patterns.Bookkeepers("-vv")])],
     //     ["y", new HardcodedExpr(HexNumber, [Patterns.SplitVector, Patterns.Bookkeepers("v-v")])],
     //     ["z", new HardcodedExpr(HexNumber, [Patterns.SplitVector, Patterns.Bookkeepers("vv-")])],
@@ -260,8 +260,8 @@ function positionInIterator(x: string, keys: MapIterator<string>) {
 
 //     constructor(
 //         public name: string,
-//         public symbols: Map<string, Expression>,
-//         public fields: Map<string, Expression>,
+//         public symbols: Map<string, BoundExpression>,
+//         public fields: Map<string, BoundExpression>,
 //     ) {
 //         super()
 //         // If constructor is not defined, then 
@@ -272,7 +272,7 @@ function positionInIterator(x: string, keys: MapIterator<string>) {
 //         if (!(constr.type instanceof Executable)) throw new CodeError("Somehow have a constructor with a non-executable type?")
 //         if ((constr.type.returnType instanceof ClassInstance)) throw new CodeError(`${this.name}'s constructor does not return a class instance.`)
 //     }
-//     getConstructor() {return (this.symbols.get("constructor") || this.fields.get("constructor") as Expression)}
+//     getConstructor() {return (this.symbols.get("constructor") || this.fields.get("constructor") as BoundExpression)}
 //     get paramTypes() { return (this.getConstructor().type as Executable).paramTypes}
 //     get returnType() { return (this.getConstructor().type as Executable).returnType}
 //     canCastFrom(that: HexType): boolean {

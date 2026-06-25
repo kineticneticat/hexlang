@@ -1,5 +1,5 @@
-import { Token, TokenKind } from "../../lexer/Token"
-import { Parser } from "../../parser/Parser"
+import { Token, TokenKind } from "../1-Lexer/Token"
+import { Parser } from "../2-Parser/Parser"
 import { HexNumber, HexString, HexType, HexVoid, OptionsType, Primitive } from "./Types"
 
 enum TypeBindingPowers {

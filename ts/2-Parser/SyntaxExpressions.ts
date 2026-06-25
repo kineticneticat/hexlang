@@ -1,9 +1,9 @@
-import { Compiler } from "../compiler/Compiler"
-import { Pattern } from "../compiler/Hex/Hex"
-import { Patterns } from "../compiler/Hex/Patterns"
+import { Compiler } from "../4-Compiler/Compiler"
+import { Pattern } from "../4-Compiler/Hex/Hex"
+import { Patterns } from "../4-Compiler/Hex/Patterns"
 // import { Builtins } from "../compiler/types/Builtins"
 // import { Class, ClassInstance, Closure, Native, HexAny, HexNumber, HexString, HexType, HexUndefined, HexVoid, List, OptionsType, Executable, HexBoolean } from "../compiler/types/Types"
-import { Token, TokenKind } from "../lexer/Token"
+import { Token, TokenKind } from "../1-Lexer/Token"
 import { CodeError } from "../Util"
 import { areBinOpArgsValid, BindingPower, getBP, getLED, getNUD } from "./LUT"
 import { Parser } from "./Parser"
@@ -17,31 +17,31 @@ function blank( func: () => void) {
 export interface SyntaxExpression {
 }
 
-export class NumberLiteralExpr implements SyntaxExpression {
+export class SyntaxNumberLiteral implements SyntaxExpression {
     value: number
     constructor(value: string) {
         this.value = parseFloat(value)
     }
 }
-export class StringLiteralExpr implements SyntaxExpression {
+export class SyntaxStringLiteral implements SyntaxExpression {
     constructor(
         public value: string
     ) {}
 }
-export class BooleanLiteralExpr implements SyntaxExpression {
+export class SyntaxBooleanLiteral implements SyntaxExpression {
     constructor(
         public value: boolean
     ) {}
 }
-export class SymbolExpr implements SyntaxExpression {
+export class SyntaxSymbol implements SyntaxExpression {
     constructor(
         public name: string,
     ) {}
 }
-export class UndefinedExpr implements SyntaxExpression {
+export class SyntaxUndefined implements SyntaxExpression {
 }
 
-export class BinaryExpression implements SyntaxExpression {
+export class SyntaxBinaryession implements SyntaxExpression {
     constructor(
         public left: SyntaxExpression,
         public operation: TokenKind,
@@ -49,28 +49,28 @@ export class BinaryExpression implements SyntaxExpression {
     ) {}
 }
 
-export class AssignmentExpr implements SyntaxExpression {
+export class SyntaxAssignment implements SyntaxExpression {
     constructor(
         public assignee: SyntaxExpression,
         public value: SyntaxExpression
     ) {}
 }
 
-export class MemberExpr implements SyntaxExpression {
+export class SyntaxMember implements SyntaxExpression {
     constructor(
         public parent: SyntaxExpression,
         public prop: string
     ) {}
 }
 
-export class CallExpr implements SyntaxExpression {
+export class SyntaxCall implements SyntaxExpression {
     constructor(
         public method: SyntaxExpression,
         public args: SyntaxExpression[]
     ) {}
 }
 
-export class ArrayExpr implements SyntaxExpression {
+export class SyntaxArray implements SyntaxExpression {
     constructor(
         public contents: SyntaxExpression[]
     ) {}
@@ -89,17 +89,17 @@ export function parseExpr(parser: Parser, bindingPower: BindingPower=BindingPowe
 export function parsePrimaryExpr(parser: Parser) {
     switch (parser.current.kind) {
         case TokenKind.NUMBERLITERAL:
-            return new NumberLiteralExpr(parser.advance().data)
+            return new SyntaxNumberLiteral(parser.advance().data)
         case TokenKind.STRINGLITERAL:
-            return new StringLiteralExpr(parser.advance().data)
+            return new SyntaxStringLiteral(parser.advance().data)
         case TokenKind.SYMBOL:
             let name = parser.current.data
             parser.advance()
-            return new SymbolExpr(name)
+            return new SyntaxSymbol(name)
         case TokenKind.TRUE:
-            return new BooleanLiteralExpr(true)
+            return new SyntaxBooleanLiteral(true)
         case TokenKind.FALSE:
-            return new BooleanLiteralExpr(false)
+            return new SyntaxBooleanLiteral(false)
         default:
             throw parser.current.source.Error(`Tried to parse ${TokenKind[parser.current.kind]} as a primary.`)
     }
@@ -108,7 +108,7 @@ export function parsePrimaryExpr(parser: Parser) {
 export function parseBinaryExpr(parser: Parser, left: SyntaxExpression, bp: BindingPower) {
     let op = parser.advance()
     let right = parseExpr(parser, getBP(op))
-    return new BinaryExpression(left, op.kind, right)
+    return new SyntaxBinaryession(left, op.kind, right)
 }
 
 export function parseGroupingExpr(parser: Parser) {
@@ -121,7 +121,7 @@ export function parseGroupingExpr(parser: Parser) {
 export function parseAssignmentExpr(parser: Parser, left: SyntaxExpression, bp: BindingPower) {
     parser.expect(TokenKind.EQUALS)
     let right = parseExpr(parser, bp)
-    return new AssignmentExpr(
+    return new SyntaxAssignment(
         left,
         right
     )
@@ -130,7 +130,7 @@ export function parseAssignmentExpr(parser: Parser, left: SyntaxExpression, bp: 
 export function parseMemberExpr(parser: Parser, left: SyntaxExpression, bp: BindingPower) {
     parser.expect(TokenKind.DOT)
     let member = parser.expect(TokenKind.SYMBOL).data
-    return new MemberExpr(
+    return new SyntaxMember(
         left,
         member
     )
@@ -146,7 +146,7 @@ export function parseCallExpr(parser: Parser, left: SyntaxExpression, bp: Bindin
         }
     }
     parser.expect(TokenKind.CLOSEBRACKET)
-    return new CallExpr(
+    return new SyntaxCall(
         left,
         args
     )
@@ -162,5 +162,5 @@ export function parseArrayExpr(parser: Parser) {
         }
     }
     parser.expect(TokenKind.CLOSESQUARE)
-    return new ArrayExpr(contents)
+    return new Array(contents)
 }

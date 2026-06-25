@@ -1,6 +1,6 @@
 import {readdirSync, readFileSync, writeFileSync} from "node:fs"
-import { tokenise } from "./lexer/Lexer"
-import { parse } from "./parser/Parser"
+import { tokenise } from "./1-Lexer/Lexer"
+import { parse } from "./2-Parser/Parser"
 import { argv } from "node:process"
 import { CodeError } from "./Util"
 

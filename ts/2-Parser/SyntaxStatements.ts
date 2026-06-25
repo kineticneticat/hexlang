@@ -1,12 +1,12 @@
-import { Token, TokenKind } from "../lexer/Token";
-import { ArrayExpr, AssignmentExpr, BinaryExpression, CallExpr, SyntaxExpression, MemberExpr, NumberLiteralExpr, parseExpr, StringLiteralExpr, SymbolExpr, UndefinedExpr } from "./SyntaxExpressions";
+import { Token, TokenKind } from "../1-Lexer/Token";
+import { SyntaxExpression, parseExpr, UndefinedSExpr } from "./SyntaxExpressions";
 import { Parser } from "./Parser";
 import { BindingPower, StatementHandler, StatementHandlers } from "./LUT";
-import { Pattern } from "../compiler/Hex/Hex";
-import { Compiler, Frame, LockedVariable } from "../compiler/Compiler";
-import { Closure, HexAny, HexType, HexUndefined, HexVoid, List, Native, OptionsType } from "../compiler/types/Types";
-import { parseType } from "../compiler/types/ParseType";
-import { parseName, Patterns } from "../compiler/Hex/Patterns";
+import { Pattern } from "../4-Compiler/Hex/Hex";
+import { Compiler, Frame, LockedVariable } from "../4-Compiler/Compiler";
+import { Closure, HexAny, HexType, HexUndefined, HexVoid, List, Native, OptionsType } from "../types/Types";
+import { parseType } from "../types/ParseType";
+import { parseName, Patterns } from "../4-Compiler/Hex/Patterns";
 import { validateHeaderName, validateHeaderValue } from "node:http";
 
 export interface SyntaxStatement {
@@ -128,7 +128,7 @@ export function parseDeclStmt(parser: Parser) {
         parser.current.source.Error("Tried to define a variable without a type nor value!")
     }
     if (value == undefined && type != undefined) {
-        value = new UndefinedExpr()
+        value = new UndefinedSExpr()
         type = new OptionsType(type, HexUndefined)
     }
     parser.expect(TokenKind.SEMICOLON)

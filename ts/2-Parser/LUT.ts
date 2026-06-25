@@ -1,7 +1,7 @@
-import { Pattern } from "../compiler/Hex/Hex";
-import { Patterns } from "../compiler/Hex/Patterns";
-import { HexAny, HexNumber, HexType } from "../compiler/types/Types";
-import { Token, TokenKind } from "../lexer/Token";
+import { Pattern } from "../4-Compiler/Hex/Hex";
+import { Patterns } from "../4-Compiler/Hex/Patterns";
+import { HexAny, HexNumber, HexType } from "../types/Types";
+import { Token, TokenKind } from "../1-Lexer/Token";
 import { CodeError } from "../Util";
 import { SyntaxExpression, parseBinaryExpr, parsePrimaryExpr, parseGroupingExpr, parseAssignmentExpr, parseMemberExpr, parseCallExpr, parseArrayExpr } from "./SyntaxExpressions";
 import { Parser } from "./Parser";

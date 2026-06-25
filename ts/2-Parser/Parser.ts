@@ -1,5 +1,5 @@
-import { HexType } from "../compiler/types/Types";
-import { Token, TokenKind } from "../lexer/Token";
+import { HexType } from "../types/Types";
+import { Token, TokenKind } from "../1-Lexer/Token";
 import { BlockStmt, parseStmt, SyntaxStatement } from "./SyntaxStatements";
 
 

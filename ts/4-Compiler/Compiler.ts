@@ -1,9 +1,9 @@
-import { SyntaxStatement } from "../parser/SyntaxStatements";
+import { SyntaxStatement } from "../2-Parser/SyntaxStatements";
 import { CodeError } from "../Util";
 import { Pattern } from "./Hex/Hex";
 import { Patterns } from "./Hex/Patterns";
 // import { Builtins } from "./types/Builtins";
-import { HexType } from "./types/Types";
+import { HexType } from "../types/Types";
 
 interface Variable {
     name: string
