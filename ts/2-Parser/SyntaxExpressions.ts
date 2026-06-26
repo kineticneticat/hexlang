@@ -1,7 +1,7 @@
 import { Compiler } from "../4-Compiler/Compiler"
 import { Pattern } from "../4-Compiler/Hex/Hex"
 import { Patterns } from "../4-Compiler/Hex/Patterns"
-import { CodeError } from "../Util"
+import { CodeError, CodeRefrence } from "../Util"
 import { areBinOpArgsValid, BindingPower, getBP, getLED, getNUD } from "./LUT"
 import { Parser } from "./Parser"
 import { BoundArray, BoundAssignment, BoundBinaryExpr, BoundBooleanLiteral, BoundCallClosure, BoundCallNative, BoundExpression, BoundMember, BoundNumberLiteral, BoundStringLiteral, BoundSymbol, BoundUndefined } from "../3-Binder/BoundExpressions"
@@ -15,45 +15,50 @@ function blank( func: () => void) {
 }
 
 export interface SyntaxExpression {
+    source: CodeRefrence
     bind(binder: Binder): BoundExpression
 }
 
 export class SyntaxNumberLiteral implements SyntaxExpression {
     value: number
-    constructor(value: string) {
+    constructor(value: string, public source: CodeRefrence) {
         this.value = parseFloat(value)
     }
     bind(binder: Binder): BoundExpression {
-        return new BoundNumberLiteral(this.value)
+        return new BoundNumberLiteral(this.value, this.source)
     }
 }
 export class SyntaxStringLiteral implements SyntaxExpression {
     constructor(
-        public value: string
+        public value: string,
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundExpression {
-        return new BoundStringLiteral(this.value)
+        return new BoundStringLiteral(this.value, this.source)
     }
 }
 export class SyntaxBooleanLiteral implements SyntaxExpression {
     constructor(
-        public value: boolean
+        public value: boolean,
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundExpression {
-        return new BoundBooleanLiteral(this.value)
+        return new BoundBooleanLiteral(this.value, this.source)
     }
 }
 export class SyntaxSymbol implements SyntaxExpression {
     constructor(
         public name: string,
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundExpression {
-        return new BoundSymbol(this.name, HexUndefined) // Actually get type
+        return new BoundSymbol(this.name, HexUndefined, this.source) // Actually get type
     }
 }
 export class SyntaxUndefined implements SyntaxExpression {
+    constructor(public source: CodeRefrence) {}
     bind(binder: Binder): BoundExpression {
-        return new BoundUndefined
+        return new BoundUndefined(this.source)
     }
 }
 
@@ -61,14 +66,16 @@ export class SyntaxBinaryession implements SyntaxExpression {
     constructor(
         public left: SyntaxExpression,
         public operation: TokenKind,
-        public right: SyntaxExpression
+        public right: SyntaxExpression,
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundExpression {
         // need to properly resolve the operator via types
         return new BoundBinaryExpr(
             {accessor: () => [], type: HexUndefined},
             this.left.bind(binder),
-            this.right.bind(binder)
+            this.right.bind(binder),
+            this.source
         )
     }
 }
@@ -76,13 +83,15 @@ export class SyntaxBinaryession implements SyntaxExpression {
 export class SyntaxAssignment implements SyntaxExpression {
     constructor(
         public assignee: SyntaxExpression,
-        public value: SyntaxExpression
+        public value: SyntaxExpression,
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundExpression {
         // check assignee exists, and that value's type matches
         return new BoundAssignment(
             this.assignee.bind(binder),
-            this.value.bind(binder)
+            this.value.bind(binder),
+            this.source
         )
     }
 }
@@ -90,12 +99,14 @@ export class SyntaxAssignment implements SyntaxExpression {
 export class SyntaxMember implements SyntaxExpression {
     constructor(
         public parent: SyntaxExpression,
-        public prop: string
+        public prop: string,
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundExpression {
         return new BoundMember(
             this.parent.bind(binder),
-            this.prop
+            this.prop,
+            this.source
         )
     }
 }
@@ -103,7 +114,8 @@ export class SyntaxMember implements SyntaxExpression {
 export class SyntaxCall implements SyntaxExpression {
     constructor(
         public method: SyntaxExpression,
-        public args: SyntaxExpression[]
+        public args: SyntaxExpression[],
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundExpression {
         // need to properly get the return type from the method's type
@@ -112,13 +124,15 @@ export class SyntaxCall implements SyntaxExpression {
             return new BoundCallClosure(
                 method,
                 this.args.map(x => x.bind(binder)),
-                method.type.returnType
+                method.type.returnType,
+                this.source
             )
         } else if (method.type instanceof Native) {
             return new BoundCallNative(
                 method,
                 this.args.map(x => x.bind(binder)),
-                method.type.returnType
+                method.type.returnType,
+                this.source
             )
         } else if (method.type instanceof Class) {
             // need to do this later
@@ -131,13 +145,15 @@ export class SyntaxCall implements SyntaxExpression {
 
 export class SyntaxArray implements SyntaxExpression {
     constructor(
-        public contents: SyntaxExpression[]
+        public contents: SyntaxExpression[],
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundExpression {
         let contents = this.contents.map(x=>x.bind(binder))
         return new BoundArray(
             contents,
-            new List(new OptionsType(...contents.map(x=>x.type)))
+            new List(new OptionsType(...contents.map(x=>x.type))),
+            this.source
         )
     }
 }
@@ -155,17 +171,16 @@ export function parseExpr(parser: Parser, bindingPower: BindingPower=BindingPowe
 export function parsePrimaryExpr(parser: Parser) {
     switch (parser.current.kind) {
         case TokenKind.NUMBERLITERAL:
-            return new SyntaxNumberLiteral(parser.advance().data)
+            return new SyntaxNumberLiteral(parser.current.data, parser.advance().source)
         case TokenKind.STRINGLITERAL:
-            return new SyntaxStringLiteral(parser.advance().data)
+            return new SyntaxStringLiteral(parser.current.data, parser.advance().source)
         case TokenKind.SYMBOL:
             let name = parser.current.data
-            parser.advance()
-            return new SyntaxSymbol(name)
+            return new SyntaxSymbol(name, parser.advance().source)
         case TokenKind.TRUE:
-            return new SyntaxBooleanLiteral(true)
+            return new SyntaxBooleanLiteral(true, parser.advance().source)
         case TokenKind.FALSE:
-            return new SyntaxBooleanLiteral(false)
+            return new SyntaxBooleanLiteral(false, parser.advance().source)
         default:
             throw parser.current.source.Error(`Tried to parse ${TokenKind[parser.current.kind]} as a primary.`)
     }
@@ -174,7 +189,9 @@ export function parsePrimaryExpr(parser: Parser) {
 export function parseBinaryExpr(parser: Parser, left: SyntaxExpression, bp: BindingPower) {
     let op = parser.advance()
     let right = parseExpr(parser, getBP(op))
-    return new SyntaxBinaryession(left, op.kind, right)
+    return new SyntaxBinaryession(left, op.kind, right, 
+        left.source.until(right.source)
+    )
 }
 
 export function parseGroupingExpr(parser: Parser) {
@@ -189,16 +206,18 @@ export function parseAssignmentExpr(parser: Parser, left: SyntaxExpression, bp: 
     let right = parseExpr(parser, bp)
     return new SyntaxAssignment(
         left,
-        right
+        right,
+        left.source.until(right.source)
     )
 }
 
 export function parseMemberExpr(parser: Parser, left: SyntaxExpression, bp: BindingPower) {
     parser.expect(TokenKind.DOT)
-    let member = parser.expect(TokenKind.SYMBOL).data
+    let right = parser.expect(TokenKind.SYMBOL)
     return new SyntaxMember(
         left,
-        member
+        right.data,
+        left.source.until(right.source)
     )
 }
 
@@ -211,15 +230,16 @@ export function parseCallExpr(parser: Parser, left: SyntaxExpression, bp: Bindin
             parser.expect(TokenKind.COMMA)
         }
     }
-    parser.expect(TokenKind.CLOSEBRACKET)
+    let cb = parser.expect(TokenKind.CLOSEBRACKET)
     return new SyntaxCall(
         left,
-        args
+        args,
+        left.source.until(cb.source)
     )
 }
 
 export function parseArrayExpr(parser: Parser) {
-    parser.expect(TokenKind.OPENSQUARE)
+    let ob = parser.expect(TokenKind.OPENSQUARE)
     let contents = [] as SyntaxExpression[]
     while (parser.hasTokens && parser.current.kind != TokenKind.CLOSESQUARE) {
         contents.push(parseExpr(parser, BindingPower.LOGICAL))
@@ -227,6 +247,8 @@ export function parseArrayExpr(parser: Parser) {
             parser.expect(TokenKind.COMMA)
         }
     }
-    parser.expect(TokenKind.CLOSESQUARE)
-    return new SyntaxArray(contents)
+    let cb = parser.expect(TokenKind.CLOSESQUARE)
+    return new SyntaxArray(contents,
+        ob.source.until(cb.source)
+    )
 }

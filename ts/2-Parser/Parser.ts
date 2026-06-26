@@ -1,4 +1,5 @@
 import { Token, TokenKind } from "../1-Lexer/Token"
+import { CodeRefrence } from "../Util"
 import { SyntaxBlock, SyntaxStatement, parseStmt } from "./SyntaxStatements"
 
 
@@ -32,5 +33,5 @@ export function parse(tokens: Token[]) {
     while (parser.hasTokens) {
         stmts.push(parseStmt(parser))
     }
-    return new SyntaxBlock(stmts)
+    return new SyntaxBlock(stmts, new CodeRefrence(0, tokens[tokens.length-1].source.start, tokens[0].source.file))
 }

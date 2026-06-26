@@ -5,28 +5,32 @@ import { Pattern } from "../4-Compiler/Hex/Hex"
 import { parseName } from "../4-Compiler/Hex/Patterns"
 import { parseType } from "../types/ParseType"
 import { HexType, HexUndefined, OptionsType } from "../types/Types"
+import { CodeRefrence } from "../Util"
 import { StatementHandlers, StatementHandler, BindingPower } from "./LUT"
 import { Parser } from "./Parser"
 import { SyntaxExpression, parseExpr, SyntaxUndefined } from "./SyntaxExpressions"
 
 export interface SyntaxStatement {
+    source: CodeRefrence
     bind(binder: Binder): BoundStatement
 }
 
 export class SyntaxBlock implements SyntaxStatement {
     constructor(
-        public statements: SyntaxStatement[]
+        public statements: SyntaxStatement[],
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundBlock {
-        return new BoundBlock(this.statements.map(x => x.bind(binder)))
+        return new BoundBlock(this.statements.map(x => x.bind(binder)), this.source)
     }
 }
 export class SyntaxExpressionStmt implements SyntaxStatement {
     constructor(
-        public expr: SyntaxExpression
+        public expr: SyntaxExpression,
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundStatement {
-        return new BoundExpressionStmt(this.expr.bind(binder))
+        return new BoundExpressionStmt(this.expr.bind(binder), this.source)
     }
 }
 
@@ -35,11 +39,12 @@ export class SyntaxDeclaration implements SyntaxStatement {
         public varName: string,
         public mutable: boolean,
         public value: SyntaxExpression,
+        public source: CodeRefrence,
         public explicitType?: HexType
     ) {}
     bind(binder: Binder): BoundStatement {
         // check variable doesnt already exist
-        return new BoundDeclaration(this.varName, this.mutable, this.value.bind(binder), this.explicitType || HexUndefined)
+        return new BoundDeclaration(this.varName, this.mutable, this.value.bind(binder), this.explicitType || HexUndefined, this.source)
     }
 }
 
@@ -49,6 +54,7 @@ export class SyntaxIf implements SyntaxStatement {
         public condition: SyntaxExpression,
         public ifblock: SyntaxBlock,
         public elifs: elif[],
+        public source: CodeRefrence,
         public elseblock?: SyntaxBlock
     ) {}
     bind(binder: Binder): BoundStatement {
@@ -56,6 +62,7 @@ export class SyntaxIf implements SyntaxStatement {
             this.condition.bind(binder),
             this.ifblock.bind(binder),
             this.elifs.map(x=>{return {condition: x.condition.bind(binder), block: x.block.bind(binder)}}),
+            this.source,
             this.elseblock?.bind(binder)
         )
     }
@@ -65,14 +72,16 @@ export class SyntaxFor implements SyntaxStatement {
     constructor(
         public variable: string,
         public range: SyntaxExpression,
-        public block: SyntaxBlock
+        public block: SyntaxBlock,
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundStatement {
         // check variable doesnt exist
         return new BoundFor(
             this.variable,
             this.range.bind(binder),
-            this.block.bind(binder)
+            this.block.bind(binder),
+            this.source
         )
     }
 }
@@ -80,12 +89,14 @@ export class SyntaxFor implements SyntaxStatement {
 export class SyntaxWhile implements SyntaxStatement {
     constructor(
         public condition: SyntaxExpression,
-        public block: SyntaxBlock
+        public block: SyntaxBlock,
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundStatement {
         return new BoundWhile(
             this.condition.bind(binder),
-            this.block.bind(binder)
+            this.block.bind(binder),
+            this.source
         )
     }
 }
@@ -96,23 +107,26 @@ export class SyntaxFunction implements SyntaxStatement {
         public args: {name: string, explicitType: HexType}[],
         public explicitReturnType: HexType,
         public body: SyntaxBlock,
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundStatement {
         return new BoundFunction(
             this.name,
             this.args.length,
             this.body.bind(binder),
-            [] // Find captures in syntax body
+            [], // Find captures in syntax body
+            this.source
         )
     }
 }
 
 export class SyntaxReturn implements SyntaxStatement {
     constructor(
+        public source: CodeRefrence,
         public value? : SyntaxExpression
     ) {}
     bind(binder: Binder): BoundStatement {
-        return new BoundReturn(this.value?.bind(this.bind))
+        return new BoundReturn(this.source, this.value?.bind(this.bind))
     }
 }
 
@@ -122,22 +136,25 @@ export class SyntaxNative implements SyntaxStatement {
         public args: {name: string, explicitType: HexType}[],
         public explicitReturnType: HexType,
         public body: Pattern[],
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundStatement {
         return new BoundNative(
             this.name,
             this.args.length,
-            this.body
+            this.body,
+            this.source
         )
     }
 }
 
 export class SyntaxClass implements SyntaxStatement {
     constructor(
-        public name: string
+        public name: string,
+        public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundStatement {
-        return new BoundClass()
+        return new BoundClass(this.source)
     }
 }
 
@@ -152,21 +169,22 @@ export function parseStmt(parser: Parser): SyntaxStatement {
 
 function parseExprStmt(parser: Parser) {
     let expr = parseExpr(parser, BindingPower.DEFAULT)
-    return new SyntaxExpressionStmt(expr)
+    return new SyntaxExpressionStmt(expr, expr.source)
 }
 
 function parseBlockStmt(parser: Parser) {
-    parser.expect(TokenKind.OPENCURLY)
+    let ob = parser.expect(TokenKind.OPENCURLY)
     let stmts = [] as SyntaxStatement[]
     while (parser.hasTokens && parser.current.kind != TokenKind.CLOSECURLY) {
         stmts.push(parseStmt(parser))
     }
-    parser.expect(TokenKind.CLOSECURLY)
-    return new SyntaxBlock(stmts)
+    let cb = parser.expect(TokenKind.CLOSECURLY)
+    return new SyntaxBlock(stmts, ob.source.until(cb.source))
 }
 
 export function parseDeclStmt(parser: Parser) {
-    let mutability = parser.advance().kind == TokenKind.LET
+    let mutability = parser.current.kind == TokenKind.LET
+    let kw = parser.advance()
     let name = parser.expect(TokenKind.SYMBOL).data
     let type: HexType | undefined = undefined
     if (parser.current.kind == TokenKind.COLON) {
@@ -182,21 +200,21 @@ export function parseDeclStmt(parser: Parser) {
         parser.current.source.Error("Tried to define a variable without a type nor value!")
     }
     if (value == undefined && type != undefined) {
-        value = new SyntaxUndefined()
+        value = new SyntaxUndefined(new CodeRefrence(0,0))
         type = new OptionsType(type, HexUndefined)
     }
-    parser.expect(TokenKind.SEMICOLON)
-    return new SyntaxDeclaration(name, mutability, value as SyntaxExpression, type)
+    let sc = parser.expect(TokenKind.SEMICOLON)
+    return new SyntaxDeclaration(name, mutability, value as SyntaxExpression, kw.source.until(sc.source), type)
 }
 
 export function parseIfStmt(parser: Parser) {
-    parser.expect(TokenKind.IF)
+    let kw = parser.expect(TokenKind.IF)
     parser.expect(TokenKind.OPENBRACKET)
     let condition = parseExpr(parser, BindingPower.DEFAULT)
     parser.expect(TokenKind.CLOSEBRACKET)
     let ifblock = parseBlockStmt(parser)
     if (parser.current.kind != TokenKind.ELIF && parser.current.kind != TokenKind.ELSE) {
-        return new SyntaxIf(condition, ifblock, [])
+        return new SyntaxIf(condition, ifblock, [], kw.source.until(ifblock.source))
     }
     let elifs = [] as elif[]
     while (parser.current.kind == TokenKind.ELIF) {
@@ -214,33 +232,33 @@ export function parseIfStmt(parser: Parser) {
     if (parser.current.kind == TokenKind.ELSE) {
         parser.expect(TokenKind.ELSE)
         let elseblock = parseBlockStmt(parser)
-        return new SyntaxIf(condition, ifblock, elifs, elseblock)
+        return new SyntaxIf(condition, ifblock, elifs, kw.source.until(elseblock.source), elseblock)
     }
-    return new SyntaxIf(condition, ifblock, elifs)
+    return new SyntaxIf(condition, ifblock, elifs, kw.source.until(elifs[elifs.length-1].block.source))
 }
 
 export function parseForStmt(parser: Parser) {
-    parser.expect(TokenKind.FOR)
+    let kw = parser.expect(TokenKind.FOR)
     parser.expect(TokenKind.OPENBRACKET)
     let name = parser.expect(TokenKind.SYMBOL).data
     parser.expect(TokenKind.IN)
     let range = parseExpr(parser, BindingPower.DEFAULT)
     parser.expect(TokenKind.CLOSEBRACKET)
     let block = parseBlockStmt(parser)
-    return new SyntaxFor(name, range, block)
+    return new SyntaxFor(name, range, block, kw.source.until(block.source))
 }
 
 export function parseWhileStmt(parser: Parser) {
-    parser.expect(TokenKind.WHILE)
+    let kw = parser.expect(TokenKind.WHILE)
     parser.expect(TokenKind.OPENBRACKET)
     let cond = parseExpr(parser, BindingPower.DEFAULT)
     parser.expect(TokenKind.CLOSEBRACKET)
     let block = parseBlockStmt(parser)
-    return new SyntaxWhile(cond, block)
+    return new SyntaxWhile(cond, block, kw.source.until(block.source))
 }
 
 export function parseFunctionStmt(parser: Parser) {
-    parser.expect(TokenKind.FUNCTION)
+    let kw = parser.expect(TokenKind.FUNCTION)
     let name = parser.expect(TokenKind.SYMBOL).data
     parser.expect(TokenKind.OPENBRACKET)
     let args = [] as {name: string, explicitType: HexType}[]
@@ -257,22 +275,23 @@ export function parseFunctionStmt(parser: Parser) {
     parser.expect(TokenKind.COLON)
     let returntype = parseType(parser)
     let body = parseBlockStmt(parser)
-    return new SyntaxFunction(name, args, returntype, body)
+    return new SyntaxFunction(name, args, returntype, body, kw.source.until(body.source))
 }
 
 export function parseReturnStmt(parser: Parser) {
-    parser.expect(TokenKind.RETURN)
+    let kw = parser.expect(TokenKind.RETURN)
     if (parser.current.kind == TokenKind.SEMICOLON) {
-        return new SyntaxReturn()
+        let sc = parser.advance()
+        return new SyntaxReturn(kw.source.until(sc.source))
     } else {
         let value = parseExpr(parser, BindingPower.DEFAULT)
-        parser.expect(TokenKind.SEMICOLON)
-        return new SyntaxReturn(value)
+        let sc = parser.expect(TokenKind.SEMICOLON)
+        return new SyntaxReturn(kw.source.until(sc.source), value)
     }
 }
 
 export function parseNativeStmt(parser: Parser) {
-    parser.expect(TokenKind.NATIVE)
+    let kw = parser.expect(TokenKind.NATIVE)
     let name = parser.expect(TokenKind.SYMBOL).data
     
     parser.expect(TokenKind.OPENBRACKET)
@@ -301,12 +320,12 @@ export function parseNativeStmt(parser: Parser) {
         parser.expect(TokenKind.SEMICOLON)
         if (parser.current.kind == TokenKind.CLOSECURLY) break loop
     }
-    parser.expect(TokenKind.CLOSECURLY)
-    return new SyntaxNative(name, args, returntype, body)
+    let cb = parser.expect(TokenKind.CLOSECURLY)
+    return new SyntaxNative(name, args, returntype, body, kw.source.until(cb.source))
 }
 
 export function parseClassStmt(parser: Parser) {
-    parser.expect(TokenKind.CLASS)
+    let kw = parser.expect(TokenKind.CLASS)
     let name = parser.expect(TokenKind.SYMBOL).data
     parser.expect(TokenKind.OPENCURLY)
     let properties = new Map<string, HexType>()
@@ -319,6 +338,6 @@ export function parseClassStmt(parser: Parser) {
             parser.expect(TokenKind.SEMICOLON)
         }
     }
-    parser.expect(TokenKind.CLOSECURLY)
-    return new SyntaxClass(name)
+    let cb = parser.expect(TokenKind.CLOSECURLY)
+    return new SyntaxClass(name, kw.source.until(cb.source))
 }

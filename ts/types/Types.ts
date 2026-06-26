@@ -1,21 +1,11 @@
-import { BoundExpression } from "../3-Binder/BoundExpressions";
+import { BoundExpression, HardcodedExpr } from "../3-Binder/BoundExpressions";
 import { CodeError } from "../Util";
 import { Compiler } from "../4-Compiler/Compiler";
 import { Pattern } from "../4-Compiler/Hex/Hex";
 import { Patterns } from "../4-Compiler/Hex/Patterns";
 
 
-export class HardcodedExpr implements BoundExpression {
-    constructor(
-        public type: HexType,
-        public hex: Pattern[],
-        public wssdelta: number = 0
-    ) {}
-    compile(compiler: Compiler): Pattern[] {
-        compiler.workingStackSize += this.wssdelta
-        return this.hex
-    }
-}
+
 
 
 export abstract class HexType {

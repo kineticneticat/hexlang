@@ -4,7 +4,8 @@ import { Token, TokenKind } from "./Token";
 class Lexer {
     constructor (
         public text: string,
-        public pos: number = 0
+        public pos: number = 0,
+        public file?: string
     ) {}
     hasRemaining() {return this.pos < this.text.length}
     get remaining() { return this.text.slice(this.pos)}
@@ -12,9 +13,9 @@ class Lexer {
 
 export function tokenise(text: string) {
     let tokens: Token[] = []
-    let parser = new Lexer(text)
-    while (parser.remaining.length > 0) {
-        let block = parser.remaining
+    let lexer = new Lexer(text)
+    while (lexer.remaining.length > 0) {
+        let block = lexer.remaining
         let matched = false
         handle: for (let handler of handlers) {
             let match = block.match(handler.matcher)
@@ -22,18 +23,18 @@ export function tokenise(text: string) {
             if (match.index != 0) continue handle
             let token = handler.handler(
                 match[0],
-                new CodeRefrence(match[0], parser.pos, match[0].length)
+                new CodeRefrence(lexer.pos, match[0].length, lexer.file)
             )
             if (token != null) tokens.push(token)
-            parser.pos += match[0].length
+            lexer.pos += match[0].length
             matched = true
             break handle
         }
         if (!matched) {
-            throw new Error(`Uknown token at pos ${parser.pos}: ${parser.text.slice(parser.pos, parser.pos+20)}`)
+            throw new Error(`Uknown token at pos ${lexer.pos}: ${lexer.text.slice(lexer.pos, lexer.pos+20)}`)
         }
     }
-    tokens.push(new Token(TokenKind.EOF, new CodeRefrence("", text.length, 0), ""))
+    tokens.push(new Token(TokenKind.EOF, new CodeRefrence(text.length, 0), ""))
     return tokens
 }
 

@@ -1,18 +1,23 @@
 import { Pattern } from "../4-Compiler/Hex/Hex";
 import { HexType } from "../types/Types";
+import { CodeRefrence } from "../Util";
 import { BoundExpression } from "./BoundExpressions";
 
-export interface BoundStatement {}
+export interface BoundStatement {
+    source: CodeRefrence
+}
 
 export class BoundBlock implements BoundStatement {
     constructor(
-        public statements: BoundStatement[]
+        public statements: BoundStatement[],
+        public source: CodeRefrence
     ) {}
 }
 
 export class BoundExpressionStmt implements BoundStatement {
     constructor(
-        public expression: BoundExpression
+        public expression: BoundExpression,
+        public source: CodeRefrence
     ) {}
 }
 
@@ -21,7 +26,8 @@ export class BoundDeclaration implements BoundStatement {
         public name: string,
         public mutable: boolean,
         public value: BoundExpression,
-        public type: HexType
+        public type: HexType,
+        public source: CodeRefrence
     ) {}
 }
 
@@ -31,7 +37,8 @@ export class BoundIf implements BoundStatement {
         public condition: BoundExpression,
         public ifblock: BoundBlock,
         public elifs: elif[],
-        public elseblock?: BoundBlock,
+        public source: CodeRefrence,
+        public elseblock?: BoundBlock
     ) {}
 }
 
@@ -39,38 +46,47 @@ export class BoundFor implements BoundStatement {
     constructor(
         public symbol: string,
         public iterable: BoundExpression,
-        public body: BoundBlock
+        public body: BoundBlock,
+        public source: CodeRefrence
     ) {}
 }
 
 export class BoundWhile implements BoundStatement {
     constructor(
-        condition: BoundExpression,
-        body: BoundBlock
+        public condition: BoundExpression,
+        public body: BoundBlock,
+        public source: CodeRefrence
     ) {}
 }
 
 export class BoundFunction implements BoundStatement {
     constructor(
-        name: string,
-        args: number,
-        body: BoundBlock,
-        captures: string[]
+        public name: string,
+        public args: number,
+        public body: BoundBlock,
+        public captures: string[],
+        public source: CodeRefrence
     ) {}
 }
 
 export class BoundReturn implements BoundStatement {
     constructor(
-        value?: BoundExpression
+        public source: CodeRefrence,
+        public value?: BoundExpression
     ) {}
 }
 
 export class BoundNative implements BoundStatement {
     constructor(
-        name: string,
-        args: number,
-        body: Pattern[]
+        public name: string,
+        public args: number,
+        public body: Pattern[],
+        public source: CodeRefrence
     ) {}
 }
 
-export class BoundClass implements BoundStatement {}
+export class BoundClass implements BoundStatement {
+    constructor(
+        public source: CodeRefrence
+    ) {}
+}
