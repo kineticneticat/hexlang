@@ -1,7 +1,33 @@
 import { CodeRefrence } from "../Util";
 import { Token, TokenKind } from "./Token";
 
-class Lexer {
+export class Lexer {
+    static tokenise(text: string, file?: string) {
+        let tokens: Token[] = []
+        let lexer = new Lexer(text, 0, file)
+        while (lexer.remaining.length > 0) {
+            let block = lexer.remaining
+            let matched = false
+            handle: for (let handler of handlers) {
+                let match = block.match(handler.matcher)
+                if (match == null) continue handle
+                if (match.index != 0) continue handle
+                let token = handler.handler(
+                    match[0],
+                    new CodeRefrence(lexer.pos, match[0].length, lexer.file)
+                )
+                if (token != null) tokens.push(token)
+                lexer.pos += match[0].length
+                matched = true
+                break handle
+            }
+            if (!matched) {
+                throw new Error(`Uknown token at pos ${lexer.pos}: ${lexer.text.slice(lexer.pos, lexer.pos+20)}`)
+            }
+        }
+        tokens.push(new Token(TokenKind.EOF, new CodeRefrence(text.length, 0), ""))
+        return tokens
+    }
     constructor (
         public text: string,
         public pos: number = 0,
@@ -11,32 +37,6 @@ class Lexer {
     get remaining() { return this.text.slice(this.pos)}
 }
 
-export function tokenise(text: string) {
-    let tokens: Token[] = []
-    let lexer = new Lexer(text)
-    while (lexer.remaining.length > 0) {
-        let block = lexer.remaining
-        let matched = false
-        handle: for (let handler of handlers) {
-            let match = block.match(handler.matcher)
-            if (match == null) continue handle
-            if (match.index != 0) continue handle
-            let token = handler.handler(
-                match[0],
-                new CodeRefrence(lexer.pos, match[0].length, lexer.file)
-            )
-            if (token != null) tokens.push(token)
-            lexer.pos += match[0].length
-            matched = true
-            break handle
-        }
-        if (!matched) {
-            throw new Error(`Uknown token at pos ${lexer.pos}: ${lexer.text.slice(lexer.pos, lexer.pos+20)}`)
-        }
-    }
-    tokens.push(new Token(TokenKind.EOF, new CodeRefrence(text.length, 0), ""))
-    return tokens
-}
 
 type TokenHandler = {matcher: RegExp|string, handler: (section: string, source: CodeRefrence) => (Token|null)}
 

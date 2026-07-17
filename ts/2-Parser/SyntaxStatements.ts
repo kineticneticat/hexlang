@@ -1,14 +1,15 @@
 import { TokenKind } from "../1-Lexer/Token"
 import { Binder } from "../3-Binder/Binder"
-import { BoundStatement, BoundBlock, BoundExpressionStmt, BoundDeclaration, BoundIf, BoundFor, BoundWhile, BoundFunction, BoundReturn, BoundNative, BoundClass } from "../3-Binder/BoundStatements"
-import { Pattern } from "../4-Compiler/Hex/Hex"
-import { parseName } from "../4-Compiler/Hex/Patterns"
+import { BoundStatement, BoundBlock, BoundExpressionStmt, BoundIf, BoundFor, BoundWhile, BoundFunction, BoundReturn, BoundNative, BoundClass, BoundMutableDec, BoundConstantDec } from "../3-Binder/BoundStatements"
+import { LockedVariable } from "../4-Compiler/Compiler"
+import { Pattern } from "../Hex/Hex"
+import { parseName } from "../Hex/Patterns"
 import { parseType } from "../types/ParseType"
-import { HexType, HexUndefined, OptionsType } from "../types/Types"
+import { Class, HexType, HexUndefined, HexVoid, List, Native, OptionsType } from "../types/Types"
 import { CodeRefrence } from "../Util"
 import { StatementHandlers, StatementHandler, BindingPower } from "./LUT"
 import { Parser } from "./Parser"
-import { SyntaxExpression, parseExpr, SyntaxUndefined } from "./SyntaxExpressions"
+import { SyntaxExpression, parseExpr, SyntaxUndefined, findExprSymbols } from "./SyntaxExpressions"
 
 export interface SyntaxStatement {
     source: CodeRefrence
@@ -36,15 +37,26 @@ export class SyntaxExpressionStmt implements SyntaxStatement {
 
 export class SyntaxDeclaration implements SyntaxStatement {
     constructor(
-        public varName: string,
+        public name: string,
         public mutable: boolean,
         public value: SyntaxExpression,
         public source: CodeRefrence,
         public explicitType?: HexType
     ) {}
     bind(binder: Binder): BoundStatement {
-        // check variable doesnt already exist
-        return new BoundDeclaration(this.varName, this.mutable, this.value.bind(binder), this.explicitType || HexUndefined, this.source)
+        if (binder.varExists(this.name)) {
+            throw this.source.Error(`Can't redefine variable ${this.name}`)
+        }
+        let value = this.value.bind(binder)
+        if (this.explicitType && !this.explicitType.canCastFrom(value.type)) {
+            throw this.source.Error(`Can't assign value of type ${value.type.name} to a variable with an explicit type ${this.explicitType.name}`)
+        }
+        binder.define(this.name, value.type, this.mutable)
+        if (this.mutable) {
+            return new BoundMutableDec(this.name, value, this.explicitType || value.type, this.source)
+        } else {
+            return new BoundConstantDec(this.name, value, this.explicitType || value.type, this.source)
+        }
     }
 }
 
@@ -76,10 +88,13 @@ export class SyntaxFor implements SyntaxStatement {
         public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundStatement {
-        // check variable doesnt exist
+        if (binder.varExists(this.variable)) throw this.source.Error(`Cant redefine variable ${this.variable} in a for-loop`)
+        let range = this.range.bind(binder)
+        if (!(range.type instanceof List)) throw this.source.Error(`Cant iterate over non-list ${range.type.name}`)
+        binder.define(this.variable, (range.type as List).type, true)
         return new BoundFor(
             this.variable,
-            this.range.bind(binder),
+            range,
             this.block.bind(binder),
             this.source
         )
@@ -104,17 +119,24 @@ export class SyntaxWhile implements SyntaxStatement {
 export class SyntaxFunction implements SyntaxStatement {
     constructor(
         public name: string,
-        public args: {name: string, explicitType: HexType}[],
+        public args: LockedVariable[],
         public explicitReturnType: HexType,
         public body: SyntaxBlock,
         public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundStatement {
+        binder.pushFrame(this.name, this.explicitReturnType)
+        this.args.forEach(x => binder.define(x.name, x.type, false))
+        let body = this.body.bind(binder)
+        binder.popFrame()
+        let captures = findStmtSymbols(this.body).filter(x => this.args.find(y => y.name == x) == undefined)
+        captures.forEach(x=> binder.varExists(x))
         return new BoundFunction(
             this.name,
-            this.args.length,
-            this.body.bind(binder),
-            [], // Find captures in syntax body
+            this.args,
+            body,
+            captures.map(x=>new LockedVariable(x, binder.getVarType(x) as HexType)),
+            this.explicitReturnType,
             this.source
         )
     }
@@ -126,23 +148,33 @@ export class SyntaxReturn implements SyntaxStatement {
         public value? : SyntaxExpression
     ) {}
     bind(binder: Binder): BoundStatement {
-        return new BoundReturn(this.source, this.value?.bind(this.bind))
+        if (binder.currentFrame.caller.returnType == null) throw this.source.Error(`Tried to return in the global scope`)
+        let value = this.value?.bind(binder)
+        if (!(value && binder.currentFrame.caller.returnType?.canCastFrom(value.type)) 
+            && !(!value && HexVoid.canCastFrom(binder.currentFrame.caller.returnType as HexType)))
+            throw this.source.Error(`Function has return type ${binder.currentFrame.caller.returnType?.name}, but tried to return ${value?.type.name}`)
+        return new BoundReturn(this.source, this.value?.bind(binder))
     }
 }
 
 export class SyntaxNative implements SyntaxStatement {
     constructor(
         public name: string,
-        public args: {name: string, explicitType: HexType}[],
+        public args: LockedVariable[],
         public explicitReturnType: HexType,
         public body: Pattern[],
         public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundStatement {
+        if (binder.varExists(this.name)) {
+            throw this.source.Error(`Cant redefine native ${this.name}`)
+        }
+        binder.define(this.name, new Native(this.args.map(x=>x.type), this.explicitReturnType), false)
         return new BoundNative(
             this.name,
-            this.args.length,
+            this.args,
             this.body,
+            this.explicitReturnType,
             this.source
         )
     }
@@ -154,6 +186,10 @@ export class SyntaxClass implements SyntaxStatement {
         public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundStatement {
+        if (binder.varExists(this.name)) {
+            throw this.source.Error(`Cant redefine class ${this.name}`)
+        }
+        binder.define(this.name, new Class(this.name, new Map, new Map), false)
         return new BoundClass(this.source)
     }
 }
@@ -197,7 +233,7 @@ export function parseDeclStmt(parser: Parser) {
         value = parseExpr(parser)
     }
     if (value == undefined && type == undefined) {
-        parser.current.source.Error("Tried to define a variable without a type nor value!")
+        throw parser.current.source.Error("Tried to define a variable without a type nor value!")
     }
     if (value == undefined && type != undefined) {
         value = new SyntaxUndefined(new CodeRefrence(0,0))
@@ -261,12 +297,12 @@ export function parseFunctionStmt(parser: Parser) {
     let kw = parser.expect(TokenKind.FUNCTION)
     let name = parser.expect(TokenKind.SYMBOL).data
     parser.expect(TokenKind.OPENBRACKET)
-    let args = [] as {name: string, explicitType: HexType}[]
+    let args = [] as LockedVariable[]
     while (parser.hasTokens && parser.current.kind != TokenKind.CLOSEBRACKET) {
         let name = parser.expect(TokenKind.SYMBOL).data
         parser.expect(TokenKind.COLON)
         let type = parseType(parser)
-        args.push({name: name, explicitType: type})
+        args.push(new LockedVariable(name, type))
         if (parser.current.kind != TokenKind.EOF && (parser.current.kind as TokenKind) != TokenKind.CLOSEBRACKET) {
             parser.expect(TokenKind.COMMA)
         }
@@ -295,12 +331,12 @@ export function parseNativeStmt(parser: Parser) {
     let name = parser.expect(TokenKind.SYMBOL).data
     
     parser.expect(TokenKind.OPENBRACKET)
-    let args = [] as {name: string, explicitType: HexType}[]
+    let args = [] as LockedVariable[]
     while (parser.hasTokens && parser.current.kind != TokenKind.CLOSEBRACKET) {
         let name = parser.expect(TokenKind.SYMBOL).data
         parser.expect(TokenKind.COLON)
         let type = parseType(parser)
-        args.push({name: name, explicitType: type})
+        args.push(new LockedVariable(name, type))
         if (parser.current.kind != TokenKind.EOF && (parser.current.kind as TokenKind) != TokenKind.CLOSEBRACKET) {
             parser.expect(TokenKind.COMMA)
         }
@@ -340,4 +376,22 @@ export function parseClassStmt(parser: Parser) {
     }
     let cb = parser.expect(TokenKind.CLOSECURLY)
     return new SyntaxClass(name, kw.source.until(cb.source))
+}
+
+export function findStmtSymbols(stmt: SyntaxStatement): string[] {
+    if (stmt instanceof SyntaxBlock) return unique(stmt.statements.map(findStmtSymbols).flat())
+    else if (stmt instanceof SyntaxExpressionStmt) return findExprSymbols(stmt.expr)
+    else if (stmt instanceof SyntaxDeclaration) return unique([findExprSymbols(stmt.value)].flat())
+    else if (stmt instanceof SyntaxIf) return unique([findExprSymbols(stmt.condition), findStmtSymbols(stmt.ifblock), stmt.elifs.map(x => [findExprSymbols(x.condition), findStmtSymbols(x.block)].flat()).flat(), stmt.elseblock ? findStmtSymbols(stmt.elseblock) : [] ].flat())
+    else if (stmt instanceof SyntaxFor) return unique([findExprSymbols(stmt.range), findStmtSymbols(stmt.block)].flat())
+    else if (stmt instanceof SyntaxWhile) return unique([findExprSymbols(stmt.condition), findStmtSymbols(stmt.block)].flat())
+    else if (stmt instanceof SyntaxFunction) return findStmtSymbols(stmt.body)
+    else if (stmt instanceof SyntaxReturn) return stmt.value ? findExprSymbols(stmt.value) : []
+    else if (stmt instanceof SyntaxNative) return []
+    else if (stmt instanceof SyntaxClass) return [] // do classes properly at somepoint lmao
+    else throw new Error("what")
+}
+
+function unique<T>(list:T[]) {
+    return list.filter((x,i,a) => a.findIndex(y => y==x) == i)
 }

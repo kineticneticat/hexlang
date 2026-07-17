@@ -1,8 +1,8 @@
-import { CodeError } from "../../Util";
+import { CodeError } from "../Util";
 import { AngleSig, Pattern, StartDir } from "./Hex";
 
 export const Patterns = {
-    NYI: Pattern.fromString("<se,sss>", "NYI"),
+    NYI: (name: string) => Pattern.fromString("<se,sss>", `NYI: ${name}`),
     Number: numberpatterns,
     DeleteNIotasUnder: deleteNIotasUnder,
     Bookkeepers: literalBookkeepers,
@@ -23,6 +23,11 @@ export const Patterns = {
     EmptyList: Pattern.fromString("<ne,qqaeaae>", "Vacant Reflection"),
     Switch: Pattern.fromString("<se,awdd>", "Augur's Exaltation"),
     Equality: Pattern.fromString("<e,ad>", "Equality Distillation"),
+    Inequality: Pattern.fromString("<e,ad>", "Equality Distillation"),
+    GreaterThan: Pattern.fromString("<e,ad>", "Equality Distillation"),
+    GreaterOrEqual: Pattern.fromString("<e,ad>", "Equality Distillation"),
+    LessThan: Pattern.fromString("<e,ad>", "Equality Distillation"),
+    LessOrEqual: Pattern.fromString("<e,ad>", "Equality Distillation"),
     Reveal: Pattern.fromString("<ne,de>", "Reveal"),
     Duplicate: Pattern.fromString("<e,aadaa>", "Gemini Decomposition"),
     Swap: Pattern.fromString("<e,aawdd>", "Jester's Gambit"),

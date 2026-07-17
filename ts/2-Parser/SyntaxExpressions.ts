@@ -1,13 +1,14 @@
 import { Compiler } from "../4-Compiler/Compiler"
-import { Pattern } from "../4-Compiler/Hex/Hex"
-import { Patterns } from "../4-Compiler/Hex/Patterns"
+import { Pattern } from "../Hex/Hex"
+import { Patterns } from "../Hex/Patterns"
 import { CodeError, CodeRefrence } from "../Util"
-import { areBinOpArgsValid, BindingPower, getBP, getLED, getNUD } from "./LUT"
+import { BindingPower, getBP, getLED, getNUD } from "./LUT"
 import { Parser } from "./Parser"
-import { BoundArray, BoundAssignment, BoundBinaryExpr, BoundBooleanLiteral, BoundCallClosure, BoundCallNative, BoundExpression, BoundMember, BoundNumberLiteral, BoundStringLiteral, BoundSymbol, BoundUndefined } from "../3-Binder/BoundExpressions"
+import { BoundArray, BoundBinaryExpr, BoundBooleanLiteral, BoundCallClosure, BoundCallNative, BoundExpression, BoundMember, BoundMemberAssignment, BoundNumberLiteral, BoundStringLiteral, BoundSymbol, BoundUndefined, BoundVariableAssignment } from "../3-Binder/BoundExpressions"
 import { Binder } from "../3-Binder/Binder"
-import { Class, Closure, HexUndefined, List, Native, OptionsType } from "../types/Types"
+import { Class, Closure, HexType, HexUndefined, List, Native, OptionsType } from "../types/Types"
 import { TokenKind } from "../1-Lexer/Token"
+import { SyntaxExpressionStmt } from "./SyntaxStatements"
 
 function blank( func: () => void) {
     func()
@@ -52,7 +53,9 @@ export class SyntaxSymbol implements SyntaxExpression {
         public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundExpression {
-        return new BoundSymbol(this.name, HexUndefined, this.source) // Actually get type
+        if (!binder.varExists(this.name)) throw this.source.Error(`Variable ${this.name} is not defined`)
+        let type = binder.getVarType(this.name) as HexType
+        return new BoundSymbol(this.name, type, this.source) // Actually get type
     }
 }
 export class SyntaxUndefined implements SyntaxExpression {
@@ -62,7 +65,7 @@ export class SyntaxUndefined implements SyntaxExpression {
     }
 }
 
-export class SyntaxBinaryession implements SyntaxExpression {
+export class SyntaxBinaryExpr implements SyntaxExpression {
     constructor(
         public left: SyntaxExpression,
         public operation: TokenKind,
@@ -70,11 +73,12 @@ export class SyntaxBinaryession implements SyntaxExpression {
         public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundExpression {
-        // need to properly resolve the operator via types
+        let left = this.left.bind(binder)
+        let right = this.right.bind(binder)
         return new BoundBinaryExpr(
-            {accessor: () => [], type: HexUndefined},
-            this.left.bind(binder),
-            this.right.bind(binder),
+            left.type.getOperator(this.operation, right.type, this.source),
+            left,
+            right,
             this.source
         )
     }
@@ -87,12 +91,24 @@ export class SyntaxAssignment implements SyntaxExpression {
         public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundExpression {
-        // check assignee exists, and that value's type matches
-        return new BoundAssignment(
-            this.assignee.bind(binder),
-            this.value.bind(binder),
-            this.source
-        )
+        let assignee = this.assignee.bind(binder)
+        let value = this.value.bind(binder)
+        if (!assignee.type.canCastFrom(value.type)) {
+            throw this.source.Error(`Cast assign value of type ${value.type} to ${assignee.type}`)
+        }
+        if (assignee instanceof BoundSymbol) {
+            return new BoundVariableAssignment(
+                assignee,
+                value,
+                this.source
+            )
+        } else if(assignee instanceof BoundMember) {
+            return new BoundMemberAssignment(
+                assignee,
+                value,
+                this.source
+            )
+        } else throw this.source.Error(`Cant assign to non symbol or member`)
     }
 }
 
@@ -118,13 +134,12 @@ export class SyntaxCall implements SyntaxExpression {
         public source: CodeRefrence
     ) {}
     bind(binder: Binder): BoundExpression {
-        // need to properly get the return type from the method's type
         let method = this.method.bind(binder)
         if (method.type instanceof Closure) {
             return new BoundCallClosure(
                 method,
                 this.args.map(x => x.bind(binder)),
-                method.type.returnType,
+                method.type,
                 this.source
             )
         } else if (method.type instanceof Native) {
@@ -138,7 +153,7 @@ export class SyntaxCall implements SyntaxExpression {
             // need to do this later
             throw new Error()
         } else {
-            throw new CodeError("Tried to call an uncallable value")
+            throw this.source.Error("Tried to call an uncallable value")
         }
     }
 }
@@ -189,7 +204,7 @@ export function parsePrimaryExpr(parser: Parser) {
 export function parseBinaryExpr(parser: Parser, left: SyntaxExpression, bp: BindingPower) {
     let op = parser.advance()
     let right = parseExpr(parser, getBP(op))
-    return new SyntaxBinaryession(left, op.kind, right, 
+    return new SyntaxBinaryExpr(left, op.kind, right, 
         left.source.until(right.source)
     )
 }
@@ -251,4 +266,21 @@ export function parseArrayExpr(parser: Parser) {
     return new SyntaxArray(contents,
         ob.source.until(cb.source)
     )
+}
+export function findExprSymbols(expr: SyntaxExpression): string[] {
+    if (expr instanceof SyntaxNumberLiteral) return []
+    else if (expr instanceof SyntaxStringLiteral) return []
+    else if (expr instanceof SyntaxBooleanLiteral) return []
+    else if (expr instanceof SyntaxUndefined) return []
+    else if (expr instanceof SyntaxSymbol) return [expr.name]
+    else if (expr instanceof SyntaxBinaryExpr) return unique([findExprSymbols(expr.left), findExprSymbols(expr.right)].flat())
+    else if (expr instanceof SyntaxAssignment) return unique([findExprSymbols(expr.assignee), findExprSymbols(expr.value)].flat())
+    else if (expr instanceof SyntaxMember) return findExprSymbols(expr.parent)
+    else if (expr instanceof SyntaxCall) return unique([findExprSymbols(expr.method), expr.args.map(findExprSymbols).flat()].flat())
+    else if (expr instanceof SyntaxArray) return unique(expr.contents.map(findExprSymbols).flat())
+    else throw new Error("what")
+}
+
+function unique<T>(list:T[]) {
+    return list.filter((x,i,a) => a.findIndex(y => y==x) == i)
 }

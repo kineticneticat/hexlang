@@ -89,25 +89,3 @@ export function getLED(token: Token) {
     if (LEDHandlers.has(token.kind)) return LEDHandlers.get(token.kind) as LEDHandler
     else throw token.source.Error(`No LED handler found for ${TokenKind[token.kind]}`)
 }
-
-type BinaryOpSignature = {left: HexType, right: HexType, result: HexType}
-function same3(type: HexType): BinaryOpSignature {return {left: type, right: type, result: type}}
-let BinaryOpSignatures = new Map<TokenKind, BinaryOpSignature[]>([
-    [TokenKind.PLUS, [same3(HexNumber)]],
-    [TokenKind.DASH, [same3(HexNumber)]],
-    [TokenKind.ASTERISK, [same3(HexNumber)]],
-    [TokenKind.SLASH, [same3(HexNumber)]],
-    [TokenKind.EQUALITY, [same3(HexAny)]],
-    [TokenKind.GREATERTHAN, [same3(HexNumber)]],
-    [TokenKind.GREATEROREQUAL, [same3(HexNumber)]],
-    [TokenKind.LESSTHAN, [same3(HexNumber)]],
-    [TokenKind.LESSOREQUAL, [same3(HexNumber)]],
-])
-export function areBinOpArgsValid(left: HexType, right: HexType, op: TokenKind): HexType|null {
-    if (!BinaryOpSignatures.has(op)) throw new Error(`No signatures for BinOp ${TokenKind[op]}`)
-    let sigs = BinaryOpSignatures.get(op) as BinaryOpSignature[]
-    for (let sig of sigs) {
-        if (sig.left.canCastFrom(left) && sig.right.canCastFrom(right)) return sig.result
-    }
-    return null
-}

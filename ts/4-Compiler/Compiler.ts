@@ -1,9 +1,11 @@
 import { SyntaxStatement } from "../2-Parser/SyntaxStatements";
 import { CodeError } from "../Util";
-import { Pattern } from "./Hex/Hex";
-import { Patterns } from "./Hex/Patterns";
+import { Pattern } from "../Hex/Hex";
+import { Patterns } from "../Hex/Patterns";
 // import { Builtins } from "./types/Builtins";
-import { HexType } from "../types/Types";
+import { Closure, HexType } from "../types/Types";
+import { BoundStatement } from "../3-Binder/BoundStatements";
+import { BoundExpression } from "../3-Binder/BoundExpressions";
 
 interface Variable {
     name: string
@@ -22,7 +24,7 @@ class ConstantVariable implements Variable {
     constructor(
         public name: string,
         public type: HexType,
-        public getter: Pattern[]
+        public value: BoundExpression
     ) {}
 }
 export class LockedVariable implements Variable {
@@ -34,22 +36,24 @@ export class LockedVariable implements Variable {
 }
 
 export class Frame {
-    localVariables: Variable[]
+    localVariables: MutableVariable[]
+    constantVariables: ConstantVariable[]
     workingStackSize: number
     constructor(
         public capturedVariables: LockedVariable[] = [],
         public argumentVariables: LockedVariable[] = [],
     ) {
         this.localVariables = []
+        this.constantVariables = []
         this.workingStackSize = 0
     }
-    get totalVariableSize() {return this.workingStackSize + this.localVariables.length + this.capturedVariables.length + this.argumentVariables.length}
+    get totalVariableStackSize() {return this.workingStackSize + this.localVariables.length + this.capturedVariables.length + this.argumentVariables.length}
 }
 
 export class Compiler {
-    static compile(ast: SyntaxStatement) {
+    static compile(ast: BoundStatement) {
         let compiler = new Compiler()
-        // return {hex: ast.compile(compiler), compiler: compiler}
+        return {hex: ast.compile(compiler), compiler: compiler}
     }
     frameStack: Frame[]
     constructor() {
@@ -59,6 +63,7 @@ export class Compiler {
     get workingStackSize() { return this.currentFrame.workingStackSize}
     set workingStackSize(wss: number) { this.frameStack[this.frameStack.length-1].workingStackSize = wss}
     get localVariables() {return this.currentFrame.localVariables}
+    get constantVariables() {return this.currentFrame.constantVariables}
     get argumentVariables() {return this.currentFrame.argumentVariables}
     get capturedVariables() {return this.currentFrame.capturedVariables}
 
@@ -68,14 +73,12 @@ export class Compiler {
     ) { this.frameStack.push(new Frame(capturedVariables, argumentVariables))}
     popFrame() { return this.frameStack.pop()}
 
-    getVariable(name: string): Pattern[] {
+    getVariable(name: string, compiler: Compiler): Pattern[] {
         let hex = [] as Pattern[]
-        let variable: Variable | undefined
-        if ((variable = this.localVariables.find(x => x.name == name))) {
-            if (variable instanceof ConstantVariable) {
-                this.workingStackSize++
-                return variable.getter
-            }
+        let variable: ConstantVariable | undefined
+        if ((variable = this.constantVariables.find(x => x.name == name))) {
+            hex = variable.value.compile(compiler)
+        } else if (this.localVariables.find(x => x.name == name)) {
             if (this.localVariables[this.localVariables.length-1]?.name == name && this.workingStackSize == 0) {
                 hex =  [Patterns.Duplicate]
             } else if (this.localVariables[this.localVariables.length-1]?.name == name && this.workingStackSize == 1) {
@@ -118,18 +121,18 @@ export class Compiler {
         this.workingStackSize++
         return hex
     }
-    declareVariable(name: string, type: HexType, mutable: boolean, getter: Pattern[]) {
-        if (this.localVariables.find(x=>x.name==name) != undefined || this.argumentVariables.find(x=>x.name==name) != undefined || this.capturedVariables.find(x=>x.name==name) != undefined) throw new CodeError(`Can't redeclare variable ${name}`)
-        if (mutable) {
-            this.frameStack[this.frameStack.length-1].localVariables.push(new MutableVariable(name, type))
-            this.workingStackSize-- // iota moved from working stack to variable stack
-            return getter
-        } else {
-            this.frameStack[this.frameStack.length-1].localVariables.push(new ConstantVariable(name, type, getter))
-            return [] // uhhhh this will break if you use any local variable accesses lmao
-        }
+    declareVariable(name: string, type: HexType, getter: Pattern[]) {
+        if (this.localVariables.find(x=>x.name==name) != undefined || this.constantVariables.find(x=>x.name==name) || this.argumentVariables.find(x=>x.name==name) != undefined || this.capturedVariables.find(x=>x.name==name) != undefined) throw new CodeError(`Can't redeclare variable ${name}`)
+        this.frameStack[this.frameStack.length-1].localVariables.push(new MutableVariable(name, type))
+        this.workingStackSize-- // iota moved from working stack to variable stack
+        return getter
+    }
+    declareConstant(name:string, type: HexType, value: BoundExpression) {
+        this.frameStack[this.frameStack.length-1].constantVariables.push(new ConstantVariable(name, type, value))
+        return [] 
     }
     setVariable(name: string, type: HexType, getter: Pattern[]) {
+        if (this.constantVariables.find(x => x.name==name) != undefined) throw new CodeError("Tried to set constant, but got to compiler somehow?")
         if (this.argumentVariables.find(x=>x.name==name) != undefined || this.capturedVariables.find(x=>x.name==name) != undefined) throw new CodeError(`Can't modify non-local variable ${name}`)
         let idx = this.localVariables.findIndex(x=>x.name==name)
         let variable = this.frameStack[this.frameStack.length-1].localVariables.splice(idx, 1)[0]
@@ -144,9 +147,15 @@ export class Compiler {
     }
     deleteVariable(name: string): Pattern[] {
         if (this.argumentVariables.find(x=>x.name==name) || this.capturedVariables.find(x=>x.name==name)) throw new CodeError(`Can't delete non-local variable ${name}`)
-        let idx = this.localVariables.findIndex(x => x.name == name)
-        this.frameStack[this.frameStack.length-1].localVariables.splice(idx, 1)
-        let hex = [Patterns.DeleteNIotasUnder(this.localVariables.length - idx + this.workingStackSize -1)]
-        return hex
+        let idx: number | undefined
+        if (idx = this.localVariables.findIndex(x => x.name == name)) {
+            this.frameStack[this.frameStack.length-1].localVariables.splice(idx, 1)
+            return [Patterns.DeleteNIotasUnder(this.localVariables.length - idx + this.workingStackSize -1)]
+        } else if (idx = this.constantVariables.findIndex(x => x.name == name)) {
+            this.frameStack[this.frameStack.length-1].localVariables.splice(idx, 1)
+            return []
+        } else throw new CodeError("Somehow tried to delete nonexistant variable")
     }
+
+    
 }

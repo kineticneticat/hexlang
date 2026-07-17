@@ -1,22 +1,19 @@
 import { BoundExpression, HardcodedExpr } from "../3-Binder/BoundExpressions";
-import { CodeError } from "../Util";
+import { BiMap, CodeError, CodeRefrence } from "../Util";
 import { Compiler } from "../4-Compiler/Compiler";
-import { Pattern } from "../4-Compiler/Hex/Hex";
-import { Patterns } from "../4-Compiler/Hex/Patterns";
-
-
-
-
+import { Pattern } from "../Hex/Hex";
+import { Patterns } from "../Hex/Patterns";
+import { TokenKind } from "../1-Lexer/Token";
 
 export abstract class HexType {
     abstract name: string
     symbols = new Map<string, BoundExpression>([])
-    // getSymbolHex(compiler: Compiler, property: string): Pattern[] | undefined {
-    //     if (!this.symbols.has(property)) return undefined
-    //     let prop = this.symbols.get(property) as BoundExpression
-    //     let doer = prop.compile(compiler)as Pattern[]
-    //     return [doer].flat()
-    // }
+    getSymbolHex(compiler: Compiler, property: string): Pattern[] | undefined {
+        if (!this.symbols.has(property)) return undefined
+        let prop = this.symbols.get(property) as BoundExpression
+        let doer = prop.compile(compiler)as Pattern[]
+        return [doer].flat()
+    }
     getSymbolType(property: string): HexType | undefined {
         if (!this.symbols.has(property)) return undefined
         return (this.symbols.get(property) as BoundExpression).type as HexType
@@ -26,12 +23,12 @@ export abstract class HexType {
     }
 
     fields = new Map<string, BoundExpression>([])
-    // getFieldHex(compiler: Compiler, getter: Pattern[], property: string): Pattern[] | undefined {
-    //     if (!this.fields.has(property)) return undefined
-    //     let prop = this.fields.get(property) as BoundExpression
-    //     let doer = prop.compile(compiler)as Pattern[]
-    //     return [getter, doer].flat()
-    // }
+    getFieldHex(compiler: Compiler, getter: Pattern[], property: string): Pattern[] | undefined {
+        if (!this.fields.has(property)) return undefined
+        let prop = this.fields.get(property) as BoundExpression
+        let doer = prop.compile(compiler)as Pattern[]
+        return [getter, doer].flat()
+    }
     getFieldType(property: string): HexType | undefined {
         if (!this.fields.has(property)) return undefined
         return (this.fields.get(property) as BoundExpression).type as HexType
@@ -51,8 +48,15 @@ export abstract class HexType {
         throw new CodeError(`Cant set Indices on type ${this.name}`)
     }
 
+    operators = new BiMap<TokenKind, string, [HexType, Pattern[]]>()
+    getOperator(operator: TokenKind, rightType: HexType, source?: CodeRefrence) {
+        if (!this.operators.has(operator, rightType.name))
+            throw source?.Error(`No valid operator exists for combination ${this.name} ${TokenKind[operator]} ${rightType.name}`)
+        return this.operators.get(operator, rightType.name) as [HexType, Pattern[]]
+    }
+
     getAccessHex(compiler: Compiler, name: string): Pattern[] {
-        return compiler.getVariable(name)
+        return compiler.getVariable(name, compiler)
     }
 
     getStaticType(property: string) {
@@ -61,16 +65,19 @@ export abstract class HexType {
             return type
         } else if (( type = this.getFieldType(property))) {
             return type
-        } else throw new CodeError(`Tried to type ${property} on ${this.name}, but couldn't find the prop.`)
+        } else {
+            // console.log(new Error().stack)
+            throw new CodeError(`Tried to type ${property} on ${this.name}, but couldn't find the prop.`)
+        }
     }
-    // getStaticHex(compiler: Compiler, parent: BoundExpression, propery: string): Pattern[] {
-    //     if (this.getSymbolType(propery)) {
-    //         return this.getSymbolHex(compiler, propery) as Pattern[]
-    //     } else if (this.getFieldType(propery)) {
-    //         return this.getFieldHex(compiler, parent.compile(compiler), propery) as Pattern[]
-    //     }
-    //     throw new CodeError(`Tried to access ${propery} on ${this.name}, but couldn't find the prop.`)
-    // }
+    getStaticHex(compiler: Compiler, parent: BoundExpression, propery: string): Pattern[] {
+        if (this.getSymbolType(propery)) {
+            return this.getSymbolHex(compiler, propery) as Pattern[]
+        } else if (this.getFieldType(propery)) {
+            return this.getFieldHex(compiler, parent.compile(compiler), propery) as Pattern[]
+        }
+        throw new CodeError(`Tried to access ${propery} on ${this.name}, but couldn't find the prop.`)
+    }
 
     // true if `that` can be cast to `this`, false otherwise
     // i.e number can cast to any, but any cant cast to number
@@ -103,7 +110,6 @@ export class Closure extends Executable {
     constructor(
         public paramTypes: HexType[],
         public returnType: HexType,
-        public leftovers?: number
     ) {super()}
     get name() {
         return `(${this.paramTypes.map(x=>x?.name).join(", ")}) => ${this.returnType.name}`
@@ -123,6 +129,18 @@ class _HexNumber extends Primitive {
     canCastFrom(that: HexType): boolean {
         return that == HexNumber
     }
+    operators: BiMap<TokenKind, string, [HexType, Pattern[]]> = new BiMap<TokenKind, string, [HexType, Pattern[]]>([
+        [[TokenKind.PLUS, "number"], [HexNumber, [Patterns.Add]]],
+        [[TokenKind.DASH, "number"], [HexNumber, [Patterns.Subtract]]],
+        [[TokenKind.ASTERISK, "number"], [HexNumber, [Patterns.Multipy]]],
+        [[TokenKind.SLASH, "number"], [HexNumber, [Patterns.Divide]]],
+        [[TokenKind.EQUALITY, "number"], [HexNumber, [Patterns.Equality]]],
+        [[TokenKind.INEQUALITY, "number"], [HexNumber, [Patterns.Inequality]]],
+        [[TokenKind.GREATERTHAN, "number"], [HexNumber, [Patterns.GreaterThan]]],
+        [[TokenKind.GREATEROREQUAL, "number"], [HexNumber, [Patterns.GreaterOrEqual]]],
+        [[TokenKind.LESSTHAN, "number"], [HexNumber, [Patterns.LessThan]]],
+        [[TokenKind.LESSOREQUAL, "number"], [HexNumber, [Patterns.LessOrEqual]]]
+    ])
 }
 export const HexNumber = new _HexNumber()
 class _HexString extends Primitive {
