@@ -4,6 +4,7 @@ import { AngleSig, Pattern, StartDir } from "./Hex";
 export const Patterns = {
     NYI: (name: string) => Pattern.fromString("<se,sss>", `NYI: ${name}`),
     Number: numberpatterns,
+    Integer: integerPattern,
     DeleteNIotasUnder: deleteNIotasUnder,
     Bookkeepers: literalBookkeepers,
     Null: Pattern.fromString("<e,d>", "Nullary Reflection"),
@@ -11,6 +12,9 @@ export const Patterns = {
     Subtract: Pattern.fromString("<nw,wddw>", "Subtractive Distillation"),
     Multipy: Pattern.fromString("<se,waqaw>", "Multipicative Distillation"),
     Divide: Pattern.fromString("<ne,wdedw>", "Division Distillation"),
+    Power: Pattern.fromString("<nw,wedew>", "Power Distillation"),
+    Sin: Pattern.fromString("<se,qqqqqaa>", "Sine Purification"),
+    Cos: Pattern.fromString("<se,qqqqqad>", "Cosine Purification"),
     Execute: Pattern.fromString("<se,deaqq>", "Hermes' Gambit"),
     ExecuteCont: Pattern.fromString("<nw,qwaqde>", "Iris' Gambit"),
     MakeList: Pattern.fromString("<sw,ewdqdwe>", "Flock's Gambit"),
@@ -18,16 +22,20 @@ export const Patterns = {
     StackSize: Pattern.fromString("<nw,qwaeawqaeaqa>", "Flock's Reflection"),
     PushFromStack: Pattern.fromString("<w,ddad>", "Fisherman's Gambit"),
     CopyFromStack: Pattern.fromString("<e,aada>", "Fisherman's Gambit II"),
+    DuplicateNTimes: Pattern.fromString("<e,aadaadaa>", "Gemini Gambit"),
     Open: Pattern.fromString("<w,qqq>", "{"),
     Close: Pattern.fromString("<e,eee>", "}"),
     EmptyList: Pattern.fromString("<ne,qqaeaae>", "Vacant Reflection"),
+    SingleList: Pattern.fromString("<e,adeeed>", "Single's Purification"),
+    AccessList: Pattern.fromString("<nw,deeed>", "Selection Distillation"),
+    SetList: Pattern.fromString("<nw,wqaeaqw>", "Surgeon's Exaltation"),
     Switch: Pattern.fromString("<se,awdd>", "Augur's Exaltation"),
     Equality: Pattern.fromString("<e,ad>", "Equality Distillation"),
-    Inequality: Pattern.fromString("<e,ad>", "Equality Distillation"),
-    GreaterThan: Pattern.fromString("<e,ad>", "Equality Distillation"),
-    GreaterOrEqual: Pattern.fromString("<e,ad>", "Equality Distillation"),
-    LessThan: Pattern.fromString("<e,ad>", "Equality Distillation"),
-    LessOrEqual: Pattern.fromString("<e,ad>", "Equality Distillation"),
+    Inequality: Pattern.fromString("<e,da>", "Inequality Distillation"),
+    GreaterThan: Pattern.fromString("<se,e>", "Maximus Distillation"),
+    GreaterOrEqual: Pattern.fromString("<se,ee>", "Maximus Distillation II"),
+    LessThan: Pattern.fromString("<sw,q>", "Minimus Distillation"),
+    LessOrEqual: Pattern.fromString("<sw,qq>", "Minimus Distillation II"),
     Reveal: Pattern.fromString("<ne,de>", "Reveal"),
     Duplicate: Pattern.fromString("<e,aadaa>", "Gemini Decomposition"),
     Swap: Pattern.fromString("<e,aawdd>", "Jester's Gambit"),
@@ -49,18 +57,30 @@ const PatternNames = new Map(Object.values(Patterns).filter(x => x instanceof Pa
 
 export function parseName(name: string) {
     if (PatternNames.has(name)) {
-        return PatternNames.get(name) as Pattern
+        return [PatternNames.get(name) as Pattern]
     } else if (name.startsWith("Bookkeeper's Gambit: ")) {
-        return Patterns.Bookkeepers(name.slice(21))
+        return [Patterns.Bookkeepers(name.slice(21))]
     } else if (name.startsWith("Numerical Reflection: ")) {
         return Patterns.Number(parseFloat(name.slice(22)))
     } else throw new CodeError(`Cant parse pattern ${name}`)
 }
 
-function numberpatterns(n: number) {
-    if (n % 1 != 0) throw new Error(`non-integers NYI: ${n}`)
+function numberpatterns(n: number): Pattern[] {
+    if (n % 1 != 0) {
+        let t = Math.sign(n)
+        n = Math.abs(n)
+        let [numer, denom] = findRatio(n)
+        return [
+            integerPattern(numer * t),
+            integerPattern(denom),
+            Patterns.Divide,
+        ]
+    } else return [integerPattern(n)]
+}
+function integerPattern(n: number){
     let name = `Numerical Reflection: ${n}`
     let pattern = n < 0 ? "dded,en<" : "aaqa,es<"
+    n = Math.abs(n)
     while (n > 0) {
         if (n % 2 == 0) {
             pattern = "a" + pattern
@@ -72,6 +92,22 @@ function numberpatterns(n: number) {
     }
     pattern = pattern.split("").reverse().join("") + ">"
     return Pattern.fromString(pattern, name)
+}
+function findRatio(n: number): [number, number] {
+    let places = Math.floor(1/(-Math.log10(n)))
+    let numerator = n * (10**places)
+    let denominator = 10 ** places
+    let g = gcd(numerator, denominator)
+    while (g != 1) {
+        numerator /= g
+        denominator /= g
+        g = gcd(numerator, denominator)
+    }
+    return [numerator, denominator]
+}
+function gcd(a:number, b:number) {
+    if (b == 0) return a
+    else return gcd(b, a % b)
 }
 
 function deleteNIotasUnder(n: number): Pattern {

@@ -4,9 +4,9 @@ import { Patterns } from "../Hex/Patterns"
 import { CodeError, CodeRefrence } from "../Util"
 import { BindingPower, getBP, getLED, getNUD } from "./LUT"
 import { Parser } from "./Parser"
-import { BoundArray, BoundBinaryExpr, BoundBooleanLiteral, BoundCallClosure, BoundCallNative, BoundExpression, BoundMember, BoundMemberAssignment, BoundNumberLiteral, BoundStringLiteral, BoundSymbol, BoundUndefined, BoundVariableAssignment } from "../3-Binder/BoundExpressions"
+import { BoundArray, BoundBinaryExpr, BoundBooleanLiteral, BoundCallClass, BoundCallClosure, BoundCallNative, BoundCallStatic, BoundExpression, BoundMember, BoundMemberAssignment, BoundNumberLiteral, BoundStringLiteral, BoundSymbol, BoundUndefined, BoundVariableAssignment } from "../3-Binder/BoundExpressions"
 import { Binder } from "../3-Binder/Binder"
-import { Class, Closure, HexType, HexUndefined, List, Native, OptionsType } from "../types/Types"
+import { Class, ClosureFunction, HexType, HexUndefined, List, NativeFunction, OptionsType, StaticFunction } from "../types/Types"
 import { TokenKind } from "../1-Lexer/Token"
 import { SyntaxExpressionStmt } from "./SyntaxStatements"
 
@@ -55,7 +55,9 @@ export class SyntaxSymbol implements SyntaxExpression {
     bind(binder: Binder): BoundExpression {
         if (!binder.varExists(this.name)) throw this.source.Error(`Variable ${this.name} is not defined`)
         let type = binder.getVarType(this.name) as HexType
-        return new BoundSymbol(this.name, type, this.source) // Actually get type
+        let bound = new BoundSymbol(this.name, type, this.source)
+        binder.noteUse(this.name, bound)
+        return bound
     }
 }
 export class SyntaxUndefined implements SyntaxExpression {
@@ -94,15 +96,22 @@ export class SyntaxAssignment implements SyntaxExpression {
         let assignee = this.assignee.bind(binder)
         let value = this.value.bind(binder)
         if (!assignee.type.canCastFrom(value.type)) {
-            throw this.source.Error(`Cast assign value of type ${value.type} to ${assignee.type}`)
+            throw this.source.Error(`Cast assign value of type ${value.type.name} to ${assignee.type.name}`)
         }
         if (assignee instanceof BoundSymbol) {
+            binder.noteUse(assignee.name, assignee)
             return new BoundVariableAssignment(
                 assignee,
                 value,
                 this.source
             )
         } else if(assignee instanceof BoundMember) {
+            let root = assignee.parent as BoundMember | BoundSymbol
+            while (root instanceof BoundMember) {
+                if(!(root.parent instanceof BoundMember) || !(root.parent instanceof BoundSymbol)) throw assignee.source.Error(`Can only assign to members derived from a symbol.`)
+                root = root.parent
+            }
+            binder.noteUse(root.name, root)
             return new BoundMemberAssignment(
                 assignee,
                 value,
@@ -135,14 +144,20 @@ export class SyntaxCall implements SyntaxExpression {
     ) {}
     bind(binder: Binder): BoundExpression {
         let method = this.method.bind(binder)
-        if (method.type instanceof Closure) {
+        if (method.type instanceof ClosureFunction) {
             return new BoundCallClosure(
                 method,
                 this.args.map(x => x.bind(binder)),
                 method.type,
                 this.source
             )
-        } else if (method.type instanceof Native) {
+        } else if (method.type instanceof StaticFunction) {
+            return new BoundCallStatic(
+                method, this.args.map(x => x.bind(binder)),
+                method.type.returnType,
+                this.source
+            )
+        } else if (method.type instanceof NativeFunction) {
             return new BoundCallNative(
                 method,
                 this.args.map(x => x.bind(binder)),
@@ -150,8 +165,11 @@ export class SyntaxCall implements SyntaxExpression {
                 this.source
             )
         } else if (method.type instanceof Class) {
-            // need to do this later
-            throw new Error()
+            return new BoundCallClass(
+                method, this.args.map(x => x.bind(binder)),
+                method.type.returnType,
+                this.source
+            )
         } else {
             throw this.source.Error("Tried to call an uncallable value")
         }

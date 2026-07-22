@@ -4,7 +4,7 @@ import { Token, TokenKind } from "../1-Lexer/Token";
 import { CodeError } from "../Util";
 import { SyntaxExpression, parseBinaryExpr, parsePrimaryExpr, parseGroupingExpr, parseAssignmentExpr, parseMemberExpr, parseCallExpr, parseArrayExpr } from "./SyntaxExpressions";
 import { Parser } from "./Parser";
-import { parseClassStmt, parseDeclStmt, parseForStmt, parseFunctionStmt, parseIfStmt, parseNativeStmt, parseReturnStmt, parseWhileStmt, SyntaxStatement } from "./SyntaxStatements";
+import { parseClassStmt, parseDeclStmt, parseExportStatement, parseForStmt, parseFunctionStmt, parseIfStmt, parseImportStmt, parseNativeStmt, parseReturnStmt, parseWhileStmt, SyntaxStatement } from "./SyntaxStatements";
 
 export enum BindingPower {
     DEFAULT,
@@ -14,6 +14,7 @@ export enum BindingPower {
     RELATIONAL,
     ADDITIVE,
     MULTIPLICATIVE,
+    EXPONENTIAL,
     UNARY,
     CALL,
     MEMBER,
@@ -30,7 +31,9 @@ export let StatementHandlers = new Map<TokenKind, StatementHandler>([
     [TokenKind.FUNCTION, parseFunctionStmt],
     [TokenKind.NATIVE, parseNativeStmt],
     [TokenKind.RETURN, parseReturnStmt],
-    [TokenKind.CLASS, parseClassStmt]
+    [TokenKind.CLASS, parseClassStmt],
+    [TokenKind.IMPORT, parseImportStmt],
+    [TokenKind.EXPORT, parseExportStatement]
 ])
 
 let BindingPowers = new Map<TokenKind, BindingPower>([
@@ -41,6 +44,7 @@ let BindingPowers = new Map<TokenKind, BindingPower>([
     [TokenKind.DASH, BindingPower.ADDITIVE],
     [TokenKind.ASTERISK, BindingPower.MULTIPLICATIVE],
     [TokenKind.SLASH, BindingPower.MULTIPLICATIVE],
+    [TokenKind.DOUBLEASTERISK, BindingPower.EXPONENTIAL],
     [TokenKind.OPENBRACKET, BindingPower.CALL],
     [TokenKind.EQUALITY, BindingPower.RELATIONAL],
     [TokenKind.GREATERTHAN, BindingPower.RELATIONAL],
@@ -76,6 +80,7 @@ let LEDHandlers = new Map<TokenKind, LEDHandler>([
     [TokenKind.DASH, parseBinaryExpr],
     [TokenKind.ASTERISK, parseBinaryExpr],
     [TokenKind.SLASH, parseBinaryExpr],
+    [TokenKind.DOUBLEASTERISK, parseBinaryExpr],
     [TokenKind.EQUALITY, parseBinaryExpr],
     [TokenKind.GREATERTHAN, parseBinaryExpr],
     [TokenKind.GREATEROREQUAL, parseBinaryExpr],

@@ -21,6 +21,9 @@ export class CodeRefrence {
         if (!this.file) throw new Error ("Cant show a file refrence with no file!")
         return readFileSync(this.file, "utf-8").slice(this.start, this.start+this.length)
     }
+    static internal(label?: string) {
+        return new CodeRefrence(0, 0, "internal" + label?label:"")
+    }
 }
 
 export class BiMap<A,B,V> {

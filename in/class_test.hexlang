@@ -1,6 +1,10 @@
-class Vector {
-    x: number;
-    y: number;
+class Foo {
+    class Bar {
+        native spam(): number {
+            Numerical Reflection: 2;
+        }
+    }
 }
 
-let vec = Vector(2, 3);
+io.print(Foo.Bar.spam());
+

@@ -1,2 +1,5 @@
-import bingle from ./import_test_B
+import pythag, foo, bar from "./import_test_B";
 
+io.print(pythag(3, 4));
+
+io.print(foo + bar);

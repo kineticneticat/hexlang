@@ -1,4 +1,5 @@
-let foo = 21;
-if (foo < 20) {
-    io.print(foo);
-}
+import Maths from "./libs/maths";
+import IO from "./libs/io"
+
+IO.Print(Maths.cos(1));
+

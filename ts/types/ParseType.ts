@@ -1,6 +1,6 @@
 import { Token, TokenKind } from "../1-Lexer/Token"
 import { Parser } from "../2-Parser/Parser"
-import { HexNumber, HexString, HexType, HexVoid, OptionsType, Primitive } from "./Types"
+import { HexAny, HexBoolean, HexEntity, HexNumber, HexString, HexType, HexUndefined, HexVector, HexVoid, OptionsType, Primitive } from "./Types"
 
 enum TypeBindingPowers {
     Default,
@@ -13,7 +13,12 @@ type TypeLEDHandler = (parser: Parser, left: HexType, bp: TypeBindingPowers) => 
 let PrimaryTypes = new Map<string, Primitive>([
     ["number", HexNumber],
     ["string", HexString],
-    ["void", HexVoid]
+    ["void", HexVoid],
+    ["any", HexAny],
+    ["boolean", HexBoolean],
+    ["entity", HexEntity],
+    ["vector", HexVector],
+    ["undefined", HexUndefined],
 ])
 
 let TypeNUDHandlers = new Map<TokenKind, TypeNUDHandler>([

@@ -1,27 +1,16 @@
 import assert from "assert";
-import { Compiler } from "../4-Compiler/Compiler";
+import { Compiler, ImmutableVariable } from "../4-Compiler/Compiler";
 import { Pattern } from "../Hex/Hex";
 import { Patterns } from "../Hex/Patterns";
-import { Class, Closure, HexBoolean, HexNumber, HexString, HexType, HexUndefined, HexVoid, Native } from "../types/Types";
-import { CodeRefrence } from "../Util";
+import { Class, ClosureFunction, HexBoolean, HexNumber, HexString, HexType, HexUndefined, HexVoid, NativeFunction } from "../types/Types";
+import { CodeError, CodeRefrence } from "../Util";
+import { BoundBlock, BoundStatement } from "./BoundStatements";
+import { compose } from "stream";
 
 export interface BoundExpression {
     type: HexType,
     source: CodeRefrence,
     compile(compiler: Compiler): Pattern[]
-}
-
-export class HardcodedExpr implements BoundExpression {
-    source = new CodeRefrence(0,0)
-    constructor(
-        public type: HexType,
-        public hex: Pattern[],
-        public wssdelta: number = 0
-    ) {}
-    compile(compiler: Compiler): Pattern[] {
-        compiler.workingStackSize += this.wssdelta
-        return this.hex
-    }
 }
 
 export class BoundNumberLiteral implements BoundExpression {
@@ -31,7 +20,8 @@ export class BoundNumberLiteral implements BoundExpression {
         public source: CodeRefrence
     ) {}
     compile(compiler: Compiler): Pattern[] {
-        return [Patterns.Number(this.value)]
+        compiler.workingStackSize++
+        return [Patterns.Integer(this.value)]
     }
 }
 
@@ -42,6 +32,7 @@ export class BoundStringLiteral implements BoundExpression {
         public source: CodeRefrence
     ) {}
     compile(compiler: Compiler): Pattern[] {
+        compiler.workingStackSize++
         return [Patterns.NYI("string")]
     }
 }
@@ -53,6 +44,7 @@ export class BoundBooleanLiteral implements BoundExpression {
         public source: CodeRefrence
     ) {}
     compile(compiler: Compiler): Pattern[] {
+        compiler.workingStackSize++
         return [this.value ? Patterns.True : Patterns.False]
     }
 }
@@ -61,18 +53,21 @@ export class BoundUndefined implements BoundExpression {
     type = HexUndefined
     constructor(public source: CodeRefrence) {}
     compile(compiler: Compiler): Pattern[] {
+        compiler.workingStackSize++
         return [Patterns.Null]
     }
 }
 
 export class BoundSymbol implements BoundExpression {
+    lastUse = false
     constructor(
         public name: string,
         public type: HexType,
         public source: CodeRefrence
     ) {}
     compile(compiler: Compiler): Pattern[] {
-        return compiler.getVariable(this.name, compiler)
+        // return compiler.getVariable(this.name, compiler, this.lastUse)
+        return this.type.getAccessHex(compiler, this.name, this.lastUse)
     }
 }
 
@@ -88,7 +83,8 @@ export class BoundBinaryExpr implements BoundExpression {
         return [
             this.left.compile(compiler),
             this.right.compile(compiler),
-            this.operator[1]
+            this.operator[1],
+            (() => {compiler.workingStackSize--; return []})()
         ].flat()
     }
 }
@@ -116,7 +112,8 @@ export class BoundMemberAssignment implements BoundExpression {
         this.type = value.type
     }
     compile(compiler: Compiler): Pattern[] {
-        return [Patterns.NYI("member")]
+        compiler.workingStackSize--
+        return this.assignee.parent.type.setStaticHex(compiler, this.assignee.parent, this.assignee.prop, this.value.compile(compiler))
     }
 }
 
@@ -142,7 +139,7 @@ export class BoundCallClosure implements BoundExpression {
         public source: CodeRefrence
     ) {}
     compile(compiler: Compiler): Pattern[] {
-        assert(this.method.type instanceof Closure)
+        assert(this.method.type instanceof ClosureFunction)
         // if (this.method.type.leftovers == undefined) throw this.source.Error("Tried to call a closure with no defined leftovers")
         return [
             this.args.map(x => x.compile(compiler)).flat(),
@@ -150,6 +147,21 @@ export class BoundCallClosure implements BoundExpression {
             Patterns.Splat, // results in a stack like [...args, ...captures, body]
             Patterns.ExecuteCont, // body is modified to clean up after itself, should just have the return iota left unless void
             (() => {compiler.workingStackSize-= (this.method.type.returnType == HexVoid ? 1 : 0)+this.args.length ; return []})()
+        ].flat()
+    }
+}
+export class BoundCallStatic implements BoundExpression {
+    constructor(
+        public method: BoundExpression,
+        public args: BoundExpression[],
+        public type: HexType,
+        public source: CodeRefrence
+    ) {}
+    compile(compiler: Compiler): Pattern[] {
+        return [
+            this.args.map(x=>x.compile(compiler)).flat(),
+            this.method.compile(compiler),
+            (() => {compiler.workingStackSize -= this.args.length; return []})()
         ].flat()
     }
 }
@@ -168,6 +180,27 @@ export class BoundCallNative implements BoundExpression {
     }
 }
 
+export class BoundCallClass implements BoundExpression {
+    constructor(
+        public method: BoundExpression,
+        public args: BoundExpression[],
+        public type: HexType,
+        public source: CodeRefrence
+    ) {}
+    compile(compiler: Compiler): Pattern[] {
+        if ((<Class>this.method.type).fields.size != 0) {
+            let constructor = (<Class>this.method.type).getConstructor()
+            if (!constructor) throw new CodeError(`Class ${this.method.type.name} has no constructor`)
+            return [
+                this.args.map(x => x.compile(compiler)).flat(),
+                constructor.compile(compiler)
+            ].flat()
+        } else {
+            return []
+        }
+    }
+}
+
 export class BoundArray implements BoundExpression {
     constructor(
         public contents: BoundExpression[],
@@ -180,5 +213,50 @@ export class BoundArray implements BoundExpression {
             Patterns.Number(this.contents.length),
             Patterns.MakeList
         ].flat()
+    }
+}
+
+export class BoundClosureFunctionValue implements BoundExpression {
+    constructor(
+        public args: ImmutableVariable[],
+        public captures: ImmutableVariable[],
+        public type: HexType,
+        public body: BoundBlock,
+        public source: CodeRefrence
+    ) {}
+    compile(compiler: Compiler): Pattern[] {
+        compiler.pushFrame(this.captures, this.args)
+        let body = this.body.compile(compiler)
+        compiler.popFrame()
+        return body
+    }
+}
+
+export class BoundStaticFunctionValue implements BoundExpression {
+    constructor(
+        public args: ImmutableVariable[],
+        public type: HexType,
+        public body: BoundBlock,
+        public source: CodeRefrence
+    ) {}
+    compile(compiler: Compiler): Pattern[] {
+        compiler.pushFrame([], this.args)
+        let body = this.body.compile(compiler)
+        compiler.popFrame()
+        return body
+    }
+}
+
+export class BoundNativeValue implements BoundExpression {
+    constructor(
+        public args: ImmutableVariable[],
+        public type: HexType,
+        public body: Pattern[],
+        public source: CodeRefrence
+    ) {}
+    compile(compiler: Compiler): Pattern[] {
+        compiler.wss(-this.args.length)
+        compiler.wss(1)
+        return this.body
     }
 }

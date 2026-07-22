@@ -13,7 +13,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.hexlang",
-				"match": "\\b(if|while|for|return|let|const|elif|else|when|in|del|function|class)\\b"
+				"match": "\\b(if|while|for|return|let|const|elif|else|when|in|del|function|class|import|from|export|native)\\b"
 			}]
 		},
 		"strings": {

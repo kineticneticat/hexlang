@@ -4,6 +4,14 @@ import { SyntaxBlock, SyntaxStatement, parseStmt } from "./SyntaxStatements"
 
 
 export class Parser {
+    static parse(tokens: Token[]) {
+        let parser = new Parser(tokens)
+        let stmts = [] as SyntaxStatement[]
+        while (parser.hasTokens) {
+            stmts.push(parseStmt(parser))
+        }
+        return new SyntaxBlock(stmts, new CodeRefrence(0, tokens[tokens.length-1].source.start, tokens[0].source.file))
+    }
     constructor (
         public tokens: Token[],
         public pos: number = 0
@@ -14,24 +22,18 @@ export class Parser {
     get prev() {
         return this.tokens[this.pos-1]
     }
+    get peek() {
+        return this.tokens[this.pos+1]
+    }
     advance() {
         this.pos++
         return this.tokens[this.pos-1]
     }
-    expect(kind: TokenKind) {
-        if (this.current.kind != kind) throw this.current.source.Error(`Expected a ${TokenKind[kind]}, got ${TokenKind[this.current.kind]}`)
+    expect(...kind: TokenKind[]) {
+        if (!kind.find(x=>x == this.current.kind)) throw this.current.source.Error(`Expected one of ${kind.map(x=>TokenKind[x]).join(", ")}, got ${TokenKind[this.current.kind]}`)
         return this.advance()
     }
     get hasTokens() {
         return this.pos < this.tokens.length && this.current.kind != TokenKind.EOF
     }
-}
-
-export function parse(tokens: Token[]) {
-    let parser = new Parser(tokens)
-    let stmts = [] as SyntaxStatement[]
-    while (parser.hasTokens) {
-        stmts.push(parseStmt(parser))
-    }
-    return new SyntaxBlock(stmts, new CodeRefrence(0, tokens[tokens.length-1].source.start, tokens[0].source.file))
 }

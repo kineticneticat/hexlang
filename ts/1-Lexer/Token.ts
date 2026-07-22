@@ -20,6 +20,7 @@ export enum TokenKind {
     PLUS,
     DASH,
     ASTERISK,
+    DOUBLEASTERISK,
     SLASH,
     EQUALS,
     COLON,
@@ -51,6 +52,8 @@ export enum TokenKind {
     RETURN,
     NATIVE,
     IMPORT,
+    FROM,
+    EXPORT,
 
     SEMICOLON,
     EOF

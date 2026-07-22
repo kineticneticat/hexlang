@@ -43,7 +43,7 @@ type TokenHandler = {matcher: RegExp|string, handler: (section: string, source: 
 function basicHandler(matcher: string|RegExp, kind: TokenKind) {
     return {
         matcher: matcher,
-        handler: (_: string, source: CodeRefrence) => new Token(kind, source, "")
+        handler: (str: string, source: CodeRefrence) => new Token(kind, source, str)
     }
 }
 function nullHandler(matcher: string|RegExp) {
@@ -56,11 +56,11 @@ function nullHandler(matcher: string|RegExp) {
 const handlers: TokenHandler[] = [
     nullHandler(/\s+/),
     {
-        matcher: /[0-9]+/,
+        matcher: /[+-]?(?:\d+\.\d+|\d+|\.\d+)/,
         handler: (section, source) => new Token(TokenKind.NUMBERLITERAL, source, section)
     },
     {
-        matcher: /"[\w]*?"/,
+        matcher: /"[\w\W]*?"/,
         handler: (section, source) => new Token(TokenKind.STRINGLITERAL, source, section.slice(1, -1))
     },
     basicHandler("let", TokenKind.LET),
@@ -76,6 +76,8 @@ const handlers: TokenHandler[] = [
     basicHandler("class", TokenKind.CLASS),
     basicHandler("native", TokenKind.NATIVE),
     basicHandler("import", TokenKind.IMPORT),
+    basicHandler("from", TokenKind.FROM),
+    basicHandler("export", TokenKind.EXPORT),
     basicHandler("true", TokenKind.TRUE),
     basicHandler("false", TokenKind.FALSE),
     {
@@ -93,6 +95,7 @@ const handlers: TokenHandler[] = [
     basicHandler("!", TokenKind.BOOLNOT),
     basicHandler("\\+", TokenKind.PLUS),
     basicHandler("-", TokenKind.DASH),
+    basicHandler("\\*\\*", TokenKind.DOUBLEASTERISK),
     basicHandler("\\*", TokenKind.ASTERISK),
     basicHandler("/", TokenKind.SLASH),
     basicHandler("=", TokenKind.EQUALS),
